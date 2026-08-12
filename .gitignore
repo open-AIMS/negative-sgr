@@ -1,0 +1,7 @@
+_targets/
+cmdstan_cache/
+analysis/phase5/
+*.rds
+*.log
+.Rhistory
+.RData

@@ -1,0 +1,6 @@
+library(testthat)
+source("../R/data_prep.R")
+source("../R/diagnostics.R")
+source("../R/simulate.R")
+source("../R/metrics.R")
+test_dir("testthat")

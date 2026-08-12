@@ -1,0 +1,8 @@
+"id","description","passed","detail"
+1,"cens() through formula, brms, ecx and nsec",TRUE,"ecx50 = 352.4; nsec = 187.5; stan code contains cens block: TRUE"
+2,"candidate set unchanged by censoring",TRUE,"8 decline models valid under gaussian: nec4param, neclin, ecxlin, ecx4param, ecxwb1, ecxwb2, ecxll5, ecxll4; check_models() args are (model, family, data) -- no censoring input, so the valid set is invariant"
+3,"per-row censoring bounds reach brms",TRUE,"10 of 70 rows passed to brms as left-censored; expected 10"
+4,"default bot prior extracted from a fit",TRUE,"bot: normal(-0.0426, 0.313665196238382) | top: normal(0.175, 0.313665196238382)"
+4,"default bot prior extracted from a fit",TRUE,"bot:  | top: "
+5,"gaussian drops zero-bounded models",TRUE,"zero-bounded decline models dropped: nec3param, ecxexp, ecxsigm, ecxwb1p3, ecxwb2p3, ecxll3; nec4param retained: TRUE; nec3param alone under gaussian errors: TRUE"
+6,"constant(0) prior on bot (arm B2/B3 feasibility)",TRUE,"bot posterior range: 0 to 0; ecx50 = 337.4; nsec = 326.3"
