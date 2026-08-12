@@ -195,3 +195,25 @@ true rather than on one side only. Arm C is retained: its behaviour is a result.
 | 2026-08-12 | Phase 1 (all gates pass) and Phase 2 complete. |
 | 2026-08-12 | Arm C measured, arm C2 added; plan revision 3. Phase 3 pipeline rerun from scratch. |
 | 2026-08-12 | Repinned from `cens-impl` to `dev` after finding the Censoring section had moved into `example1` in a commit `cens-impl` predates. Phase 1 re-verified (identical), Phase 3 restarted. |
+| 2026-08-13 | Arm C2 non-convergence on `r_salina` traced to one stuck chain and fixed by a general refit-once-on-Rhat rule in `fit_arm()`; Phase 3 re-run (1h25m) so every fit comes from one code path. Simulation truth recalibrated from the arm-A posterior after the hand-picked values proved to be a near-step curve. Phase 5 pilot and budget complete. Session paused; see `RESUME.md`. |
+
+## Corrections made during the work, for the record
+
+Three claims of mine were withdrawn after being tested rather than assumed. They
+are listed because each one would have shaped a result if it had gone unchecked.
+
+1. **"Arm C pushes `bot` down without bound."** Wrong. The censored contribution
+   is monotone in `mu` but *saturates*, so the likelihood is flat rather than
+   sloped and the prior decides. Withdrawn when the fit was run.
+2. **"The Censoring section lives in `example6`, not `example1`."** Wrong — read
+   off `cens-impl`, which predates commit `ee76e815`. The plan was right.
+3. **"Arm C is pathologically slow."** Wrong; that was `adapt_delta = 0.99` on
+   `c_proliferum` under the superseded pin. In the final run arm C took 8m33s
+   against B2's 16m and D's 30m.
+
+And one design error caught before it consumed compute: the simulation truth was
+hand-set to `nec = 5, beta = log(0.4)`, which puts the whole transition from
+control to zero growth inside 0.6 concentration units. No design resolves that,
+every arm would have failed identically, and the simulation would have returned a
+confident null. `resolves_transition()` now refuses any cell with fewer than three
+tested concentrations between ErC10 and the zero crossing.
