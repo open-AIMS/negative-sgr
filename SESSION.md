@@ -54,13 +54,17 @@ result — only which vignette the Phase 6 edit belongs in, and which package me
 | R | 4.6.1 (2026-06-24) |
 | backend | `cmdstanr` |
 | cores available | 22 |
-| cores used by this study | 6 (`STUDY_CORES` in `R/setup.R`) |
+| cores used by this study | 18 from 2026-08-14; 6 before that (`STUDY_CORES` in `R/setup.R`) |
 
-**Shared machine.** Another study (`R/reanalysis_fit_worker.R`, 4 worker
-processes each running cmdstan chains) occupies roughly half this box for the
-duration. Parallelism is capped so that timing figures are reproducible and the
-other run is not starved. Any wall-clock number recorded here was measured under
-that contention and is an upper bound.
+**Shared machine, until 2026-08-14.** Another study
+(`R/reanalysis_fit_worker.R`, 4 worker processes each running cmdstan chains)
+occupied roughly half this box through Phases 1-3 and the Phase 5 pilot.
+Parallelism was capped at 6 so that timing figures stayed reproducible and the
+other run was not starved, so **every wall-clock number recorded for those
+phases was measured under contention and is an upper bound**. That study has
+since finished and `STUDY_CORES` is 18, leaving 4 cores for interactive
+sessions. Per-fit costs are per-core and carry over; wall-clock projections made
+against the 6-worker pilot must be rescaled.
 
 **Stan compile cache.** `cmdstanr` rebuilds every model in a fresh session,
 which costs 3-5 minutes per model here. `use_compile_cache()` points
@@ -117,10 +121,12 @@ Full table in `analysis/dataset_summary.csv`; tests in
   `c_proliferum` and `r_salina` and `> 0.99999` on the other two, so the supplied
   SGR column was computed deterministically from those densities and a single
   inoculum density. `t` = 7, 7, 3, 3 d; `n_0` = 7968, 8684, 3871, 3123 cells/mL.
-- **The two LODs differ**: 10 cells/mL for `r_salina`, **100** for `r_salina2`.
-  Each is confirmed arithmetically -- the bound it implies
-  (`(ln LOD - ln n_0)/t` = -1.9862 and -1.1470) equals the SGR of the rows
-  detected exactly at that limit, to all printed digits.
+- **The two LODs were taken to differ**: 10 cells/mL for `r_salina`, 100 for
+  `r_salina2`. Each bound (`(ln LOD - ln n_0)/t` = -1.9862 and -1.1470) equals
+  the SGR of the lowest detected row to all printed digits. **The `r_salina2`
+  value is now in doubt** -- that arithmetic only shows the lowest row sits at
+  the assumed limit, which is true of any assumed limit chosen this way. See
+  "Open: `r_salina2`'s detection limit is probably 10, not 100" below.
 - **Every zero in the two *Rhodomonas* SGR columns is a zero cell density**,
   where SGR is undefined rather than zero. The *Cladocopium* sets have none.
 - **The supplied CSVs are not fully floored.** The labs substituted 0 for the
