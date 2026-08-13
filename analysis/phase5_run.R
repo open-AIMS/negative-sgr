@@ -37,6 +37,15 @@ MCMC_SIM <- list(chains = 4L, iter = 2000L, warmup = 1000L, adapt_delta = 0.95,
 
 cal <- calibrate_sigma(read_sgr("c_proliferum"))
 
+## Residual scale is held ABSOLUTE across cells, anchored at R = 2.3.
+##
+## Under the "cv" mode the whole generating model is exactly scale-equivariant
+## in the growth rate, so R cannot change any endpoint and the R sweep would be
+## a null manipulation -- see the long note in R/simulate.R. Anchoring here means
+## the nine R = 2.3 core cells are numerically identical to the pilot, while the
+## R sweep varies signal-to-noise the way a real change in control growth does.
+SIGMA_0 <- sigma_0_at(cal$cv_control, R_ref = 2.3, t = 7)
+
 ## ----------------------------------------------------------------- cells ----
 ## Delta levels are the discarded effect fractions measured on the real
 ## datasets, so a simulation cell and a real dataset sit on the same axis:
@@ -76,7 +85,11 @@ cat("WORKERS =", WORKERS, "\n\n")
 ## ------------------------------------------------------------ one iteration --
 run_iteration <- function(i, truth, design, sigma_ratio) {
   sim <- simulate_dataset(truth, design, cv_control = cal$cv_control,
-                          sigma_ratio = sigma_ratio, seed = 7e5 + i)
+                          sigma_ratio = sigma_ratio, seed = 7e5 + i,
+                          sigma_mode = "absolute", sigma_0_abs = SIGMA_0)
+  # The fraction of responses the convention actually discards, recorded per
+  # iteration because it is the quantity R is expected to act through.
+  f_neg <- mean(sim$sgr < 0)
   a_prep <- prepare_sgr(sim, "raw", meta = sim_meta())
   pr <- arm_prior(a_prep$x, a_prep$y)
   mcmc <- MCMC_SIM; mcmc$seed <- MCMC_SIM$seed + i
@@ -127,7 +140,7 @@ run_iteration <- function(i, truth, design, sigma_ratio) {
                                error = NA_character_)
     }
   }
-  cbind(iteration = i, do.call(rbind, out), row.names = NULL)
+  cbind(iteration = i, f_neg = f_neg, do.call(rbind, out), row.names = NULL)
 }
 
 ## ------------------------------------------------------------------ sweep ----

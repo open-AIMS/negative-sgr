@@ -88,11 +88,59 @@ sim_design <- function(truth, top_factor = 1, n_conc = 12, n_rep = 5,
 #' #191), so the heteroscedastic cells are *generated* heteroscedastic and
 #' *fitted* homoscedastic. That is the realistic case, and it is described in
 #' the results as misspecification rather than as a fitting option.
-sim_sigma <- function(x, truth, cv_control = 0.096, sigma_ratio = 1) {
-  sigma_0 <- cv_control * truth$top
+#' @param sigma_mode How the control residual SD is set.
+#'   `"cv"` holds the *coefficient of variation* of the growth rate fixed, so
+#'   `sigma_0 = cv_control * top`. `"absolute"` holds `sigma_0` itself fixed at
+#'   `sigma_0_abs`, independent of the growth rate.
+#' @param sigma_0_abs Control residual SD for `sigma_mode = "absolute"`. Anchor
+#'   it with `sigma_0_at()` so that the reference cell is unchanged.
+##
+## Why the mode matters, and why "absolute" is the physically right default for
+## any cell that varies R.
+##
+## Under "cv" the generating model is EXACTLY equivariant under rescaling the
+## growth rate. top, bot and sigma are all proportional to mu_0 = log(R)/t,
+## while nec, beta and the design do not involve R at all, so changing R
+## multiplies every simulated response by a constant and leaves the x-axis
+## untouched. Since ErCx, NSEC and the zero crossing are all x-axis quantities,
+## and since flooring (max(y,0)), censoring (y <= 0) and a bot fixed at 0 are
+## all scale-equivariant too, EVERY arm returns the same answer at every R.
+## Verified numerically: with a common seed, y(R=73) = 5.1512 * y(R=2.3) to
+## 3e-16, with identical rows floored and identical f_neg.
+##
+## So R is not an axis under "cv" -- which is a result in itself, and explains
+## why Phase 3's R-ordering prediction failed on the real data. It was not
+## underpowered at n = 4; it was structurally impossible.
+##
+## The equivariance is an artefact of tying sigma to mu_0. It is not the physics.
+## Counting error lives on the log-density scale: with SD s on ln N at each time
+## point, SGR = (ln N_t - ln N_0)/t has SD ~ s*sqrt(2)/t, which does not depend
+## on the growth rate. Two tests with the same counting precision and different
+## control growth rates have the same absolute SGR noise and different signal.
+## Holding sigma_0 fixed is therefore what lets R enter at all, and it enters
+## the way it should -- as signal-to-noise, which is also what OECD TG 201's
+## R >= 16 validity criterion is implicitly buying.
+sim_sigma <- function(x, truth, cv_control = 0.096, sigma_ratio = 1,
+                      sigma_mode = c("cv", "absolute"), sigma_0_abs = NULL) {
+  sigma_mode <- match.arg(sigma_mode)
+  sigma_0 <- if (identical(sigma_mode, "absolute")) {
+    if (is.null(sigma_0_abs)) stop("sigma_mode = 'absolute' needs sigma_0_abs.")
+    sigma_0_abs
+  } else {
+    cv_control * truth$top
+  }
   mu <- nec4param_curve(x, truth$top, truth$bot, truth$beta, truth$nec)
   lost <- (truth$top - mu) / (truth$top - truth$bot)
   sigma_0 * (1 + (sigma_ratio - 1) * lost)
+}
+
+#' The absolute control SD implied by a CV at a reference growth rate
+#'
+#' Anchors `sigma_mode = "absolute"` so that the reference cell is numerically
+#' identical to the "cv" cell it replaces, and only the cells that move away
+#' from `R_ref` change. Keeps the 9 core cells bit-comparable with the pilot.
+sigma_0_at <- function(cv_control, R_ref = 2.3, t = 7) {
+  cv_control * log(R_ref) / t
 }
 
 #' Generate one simulated dataset
@@ -102,10 +150,14 @@ sim_sigma <- function(x, truth, cv_control = 0.096, sigma_ratio = 1) {
 #' reused unchanged -- the simulation has no detection limit, so no row is ever
 #' undefined and `raw`, `bound` and `supplied` coincide.
 simulate_dataset <- function(truth, design, cv_control = 0.096,
-                             sigma_ratio = 1, n_0 = 8000, seed = NULL) {
+                             sigma_ratio = 1, n_0 = 8000, seed = NULL,
+                             sigma_mode = c("cv", "absolute"),
+                             sigma_0_abs = NULL) {
+  sigma_mode <- match.arg(sigma_mode)
   if (!is.null(seed)) set.seed(seed)
   mu <- nec4param_curve(design$x, truth$top, truth$bot, truth$beta, truth$nec)
-  sg <- sim_sigma(design$x, truth, cv_control, sigma_ratio)
+  sg <- sim_sigma(design$x, truth, cv_control, sigma_ratio,
+                  sigma_mode = sigma_mode, sigma_0_abs = sigma_0_abs)
   y <- stats::rnorm(length(mu), mu, sg)
   data.frame(
     dataset = "sim",

@@ -121,3 +121,67 @@ test_that("MCSE formulas behave", {
                sqrt(m$coverage * (1 - m$coverage) / 500))
   expect_equal(iterations_for_coverage_mcse(0.02), ceiling(0.95 * 0.05 / 0.0004))
 })
+
+## The scale-equivariance result and the fix for it. These are the tests that
+## stop the R sweep silently becoming a null manipulation again.
+
+test_that("under sigma_mode = 'cv' the model is exactly scale-equivariant in R", {
+  # top, bot and sigma are all proportional to mu_0 = log(R)/t, while nec, beta
+  # and the design do not involve R, so changing R multiplies the response by a
+  # constant and leaves every x-axis quantity alone.
+  mk <- function(R) {
+    tr <- sim_truth(R = R, delta = 4, t = 7)
+    d <- sim_design(tr, top_factor = 2)
+    list(tr = tr, y = simulate_dataset(tr, d, seed = 11, sigma_ratio = 3)$sgr,
+         d = d)
+  }
+  a <- mk(2.3); b <- mk(73)
+  cc <- b$tr$mu_0 / a$tr$mu_0
+  expect_equal(b$y, cc * a$y)
+  expect_equal(a$d$x, b$d$x)
+  # Hence identical rows floored, identical f_neg, identical endpoints.
+  expect_identical(a$y < 0, b$y < 0)
+  expect_equal(true_endpoints(a$tr)$truth, true_endpoints(b$tr)$truth)
+  expect_equal(a$tr$zero_crossing, b$tr$zero_crossing)
+})
+
+test_that("sigma_mode = 'absolute' breaks the equivariance and needs an anchor", {
+  s0 <- sigma_0_at(0.096, R_ref = 2.3, t = 7)
+  expect_equal(s0, 0.096 * log(2.3) / 7)
+  gen <- function(R) {
+    tr <- sim_truth(R = R, delta = 4, t = 7)
+    simulate_dataset(tr, sim_design(tr, top_factor = 2), seed = 11,
+                     sigma_ratio = 3, sigma_mode = "absolute",
+                     sigma_0_abs = s0)$sgr
+  }
+  a <- gen(2.3); b <- gen(73)
+  cc <- sim_truth(R = 73)$mu_0 / sim_truth(R = 2.3)$mu_0
+  expect_false(isTRUE(all.equal(b, cc * a)))
+  # Signal-to-noise rises with R. Asserted on sim_sigma directly rather than on
+  # sd(y): the spread of y is dominated by the mean curve's variation across the
+  # design, which is scale-equivariant and swamps the residual term, so the
+  # stochastic version of this check is near-powerless at n = 70.
+  noise_to_signal <- function(R) {
+    tr <- sim_truth(R = R, delta = 4, t = 7)
+    sim_sigma(0, tr, sigma_ratio = 3, sigma_mode = "absolute",
+              sigma_0_abs = s0) / tr$top
+  }
+  expect_lt(noise_to_signal(73), noise_to_signal(2.3))
+  expect_equal(noise_to_signal(2.3), 0.096)          # the anchor, exactly
+  expect_equal(noise_to_signal(73), s0 / sim_truth(R = 73)$mu_0)
+  expect_error(sim_sigma(1, sim_truth(), sigma_mode = "absolute"),
+               "needs sigma_0_abs")
+})
+
+test_that("the anchor leaves the reference cell untouched", {
+  # The nine R = 2.3 core cells must be numerically identical under both modes,
+  # so the sweep stays comparable with the pilot timing run.
+  tr <- sim_truth(R = 2.3, delta = 4, t = 7)
+  d <- sim_design(tr, top_factor = 2)
+  s0 <- sigma_0_at(0.096, R_ref = 2.3, t = 7)
+  expect_identical(
+    simulate_dataset(tr, d, cv_control = 0.096, sigma_ratio = 3, seed = 5)$sgr,
+    simulate_dataset(tr, d, cv_control = 0.096, sigma_ratio = 3, seed = 5,
+                     sigma_mode = "absolute", sigma_0_abs = s0)$sgr
+  )
+})

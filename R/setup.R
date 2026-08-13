@@ -22,9 +22,12 @@ BAYESNEC_WORKTREE <- "/mnt/c/Rworking/bayesnec-issue173"
 BAYESNEC_BRANCH   <- "dev"
 BAYESNEC_SHA      <- "374e511c665fee04ca6ca8e7b48a547a3928a28d"
 
-## Another long-running study shares this machine (~11 of 22 cores). Cap our own
-## parallelism so timings are reproducible and the other run is not starved.
-STUDY_CORES <- 6L
+## 22 cores. The competing study that had claimed about half of them has
+## finished, so the cap is raised to 18, leaving 4 for the interactive Positron
+## sessions. Note that the Phase 5 pilot TIMINGS were measured at 6 workers --
+## per-fit costs are per-core and should carry over, but wall-clock projections
+## made against the pilot must be rescaled.
+STUDY_CORES <- 18L
 
 ## MCMC settings used everywhere except the pilot timing run.
 MCMC <- list(chains = 4L, iter = 4000L, warmup = 2000L, adapt_delta = 0.99,
