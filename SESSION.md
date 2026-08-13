@@ -257,7 +257,48 @@ well-determined negatives, so discarding them destroys more information".
 | 2026-08-12 | Arm C measured, arm C2 added; plan revision 3. Phase 3 pipeline rerun from scratch. |
 | 2026-08-12 | Repinned from `cens-impl` to `dev` after finding the Censoring section had moved into `example1` in a commit `cens-impl` predates. Phase 1 re-verified (identical), Phase 3 restarted. |
 | 2026-08-13 | Arm C2 non-convergence on `r_salina` traced to one stuck chain and fixed by a general refit-once-on-Rhat rule in `fit_arm()`; Phase 3 re-run (1h25m) so every fit comes from one code path. Simulation truth recalibrated from the arm-A posterior after the hand-picked values proved to be a near-step curve. Phase 5 pilot and budget complete. Session paused; see `RESUME.md`. |
-| 2026-08-14 | Scale-equivariance in `R` found and fixed before the sweep (`sigma_mode`, `sigma_0_at()`); `STUDY_CORES` raised to 18; Phase 5 `rsep` sweep launched at 240 iterations per cell. |
+| 2026-08-14 | `r_salina2` LOD queried (10 vs 100), pending protocol confirmation. Scale-equivariance in `R` found and fixed before the sweep (`sigma_mode`, `sigma_0_at()`); `STUDY_CORES` raised to 18; Phase 5 `rsep` sweep launched at 240 iterations per cell. |
+
+## Open: `r_salina2`'s detection limit is probably 10, not 100
+
+Found 2026-08-14 while cross-checking against the package's shipped `alga`
+dataset, which is these same four tests. **This changes a Phase 3 result and
+needs protocol confirmation before it is either adopted or dismissed.**
+
+`dataset_meta()` asserts `lod = c(NA, NA, 10, 100)`, and `infer_lod()` "checks"
+it as the smallest positive recorded density. That is not an independent check --
+it is the same inference twice, and it conflates the smallest density *observed*
+with the smallest density *observable*.
+
+The densities themselves argue against 100:
+
+| test | lowest recorded densities | reading |
+|---|---|---|
+| `r_salina` x A | 0, 10, 30, 36210, ... | 3 rows sit at exactly 10, on a grid of 10. The limit is 10. |
+| `r_salina` x B (`r_salina2`) | 0, 100, 230, 290, 330, 450, ... | 230 and 290 put the reporting grid at 10, not 100. One row at 100 is just the sample minimum. |
+
+Same species, same duration, same laboratory, and test A demonstrably reports
+densities of 10 and 30. There is no positive evidence that test B could not have
+reported a density below 100; nothing simply fell in that window among its four
+below-limit rows.
+
+If the limit is 10, `r_salina2`'s bound moves from
+`(log 100 - log 3123)/3 = -1.147` to `(log 10 - log 3123)/3 = -1.915`. That is
+not cosmetic: arm A's `bot` on `r_salina2` is -1.188 [-1.335, -1.057] with an SD
+of 0.071, pinned against the assumed bound, so the assumed value is most of the
+answer. Arms A, B2 and D take the `bound` preparation and C2 takes it as the
+interval's upper end, so four of the seven arms move on that dataset. The nine
+`c_proliferum` fits and the whole simulation are unaffected -- the simulation
+uses `sim_meta()`, where `lod` is `NA`.
+
+Not changed unilaterally, because it is a fact about the counting protocol rather
+than about the data, and the protocols have not yet been consulted (see the
+standing protocol item in `RESUME.md`). The cost of adopting it is a re-run of
+the `r_salina2` column of Phase 3, not of the whole pipeline.
+
+Note the package's own `notes/alga_dataset.md` states a single counting
+resolution of 10 for the dataset and gives one bound formula using it, which is
+consistent with the reading above and inconsistent with this study's 100.
 
 ## Corrections made during the work, for the record
 
