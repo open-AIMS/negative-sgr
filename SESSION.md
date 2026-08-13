@@ -187,6 +187,67 @@ This does not restore identification, which nothing can once the magnitudes are
 discarded, but it bounds the flat region on both sides with a statement that is
 true rather than on one side only. Arm C is retained: its behaviour is a result.
 
+## The control fold-change R is not an axis on the growth-rate scale
+
+Found on 2026-08-14, before the Phase 5 sweep was launched, by checking the cells
+rather than trusting them.
+
+Parameterised as the study parameterises it -- `mu_0 = log(R)/t`, `top = mu_0`,
+`bot = -Delta * mu_0`, and `sigma_0 = cv_control * top` -- the generating model is
+**exactly equivariant under rescaling the growth rate**. `nec`, `beta` and the
+concentration design do not involve `R` at all, so changing `R` multiplies every
+simulated response by a constant and leaves every x-axis quantity untouched.
+
+Verified numerically at `delta = 4`, `top_factor = 2`, common seed:
+
+| quantity | R = 2.3 | R = 73 |
+|---|---|---|
+| `y` | reference | `5.1512 x` reference, max deviation 3.3e-16 |
+| design `x` | identical | identical |
+| rows floored (`y < 0`) | identical | identical |
+| `f_neg` | 0.1714 | 0.1714 |
+| `top` prior | `normal(0.1266, 0.1921)` | `normal(0.6520, 0.9896)` = `5.1512 x` |
+| `nec`, `beta` priors | identical | identical |
+
+Every estimand is an x-axis quantity (ErC10, ErC50, NSEC, the zero crossing), and
+every arm is scale-equivariant too -- flooring is `max(y, 0)`, censoring is
+`y <= 0`, a fixed `bot` is `0`, and arm D truncates at an x-axis crossing. So
+**every arm returns the same answer at every R**, and the `rsep` R sweep as
+originally written would have produced three copies of one cell.
+
+Two consequences.
+
+**It settles the Phase 3 ordering failure analytically.** The pre-registered
+prediction that divergence should order with `R` did not fail for want of power
+at n = 4. Under this model it is structurally impossible: `R` has no path to any
+endpoint. The `Delta` ordering remains an open empirical question; the `R`
+ordering does not.
+
+**The equivariance is an artefact of the sigma model, not the physics.** Tying
+`sigma` to `mu_0` holds the *coefficient of variation of the growth rate* fixed.
+But counting error lives on the log-density scale: with SD `s` on `ln N` at each
+time point, `SGR = (ln N_t - ln N_0)/t` has SD about `s*sqrt(2)/t`, independent of
+the growth rate. Two tests with the same counting precision and different control
+growth rates have the *same* absolute SGR noise and *different* signal. Holding
+`sigma_0` fixed is therefore what lets `R` enter, and it enters as
+signal-to-noise -- which is plausibly what OECD TG 201's `R >= 16` validity
+criterion is implicitly buying, and is worth saying in the paper.
+
+`sim_sigma()` and `simulate_dataset()` gained `sigma_mode` (`"cv"`, the original,
+kept so the equivariance stays demonstrable; `"absolute"`) and `sigma_0_at()`
+anchors the absolute mode. Phase 5 anchors at `R = 2.3`, so the nine core cells
+are numerically identical to the pilot -- checked, difference exactly 0 -- and
+only the three R cells change. Across the sweep the control CV now falls 9.6% ->
+6.7% -> 2.8% -> 1.9% as `R` goes 2.3 -> 3.3 -> 17 -> 73, and `f_neg` falls 0.171
+-> 0.143. `f_neg` is now recorded per iteration as the mediating quantity.
+
+Note that `f_neg` moves much less than the CV does. Most negative observations
+come from the region where the true mean is genuinely below zero, and that region
+is fixed by the design, which is scale-invariant. What `R` changes is how
+*precisely* those negative values are measured. The mechanism to look for in the
+results is therefore not "high R produces fewer negatives" but "high R produces
+well-determined negatives, so discarding them destroys more information".
+
 ## Change log
 
 | date | change |
@@ -196,6 +257,7 @@ true rather than on one side only. Arm C is retained: its behaviour is a result.
 | 2026-08-12 | Arm C measured, arm C2 added; plan revision 3. Phase 3 pipeline rerun from scratch. |
 | 2026-08-12 | Repinned from `cens-impl` to `dev` after finding the Censoring section had moved into `example1` in a commit `cens-impl` predates. Phase 1 re-verified (identical), Phase 3 restarted. |
 | 2026-08-13 | Arm C2 non-convergence on `r_salina` traced to one stuck chain and fixed by a general refit-once-on-Rhat rule in `fit_arm()`; Phase 3 re-run (1h25m) so every fit comes from one code path. Simulation truth recalibrated from the arm-A posterior after the hand-picked values proved to be a near-step curve. Phase 5 pilot and budget complete. Session paused; see `RESUME.md`. |
+| 2026-08-14 | Scale-equivariance in `R` found and fixed before the sweep (`sigma_mode`, `sigma_0_at()`); `STUDY_CORES` raised to 18; Phase 5 `rsep` sweep launched at 240 iterations per cell. |
 
 ## Corrections made during the work, for the record
 
