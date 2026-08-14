@@ -18,22 +18,41 @@ test_that("the test design recovers exactly from density/SGR pairs", {
   expect_equal(recover_design(dats$r_salina)$n_0, 3871, tolerance = 1e-3)
 })
 
-test_that("the LODs are 10 and 100, and are recoverable from the data", {
-  # The bound each LOD implies must equal the SGR of the rows detected exactly
-  # at that limit. This confirms the LOD without needing the protocol.
+test_that("both Rhodomonas LODs are 10, and the data are consistent with that", {
+  # The LOD is a protocol fact. The data can only ever bound it from above, so
+  # this asserts consistency, not recovery. The earlier version of this test
+  # asserted lod == min_detected_density() and called that confirmation "without
+  # needing the protocol" -- which is the same inference twice, and is how
+  # r_salina2 came to be recorded at 100.
   meta <- dataset_meta()
+  expect_equal(meta$lod[meta$dataset == "r_salina"], 10)
+  expect_equal(meta$lod[meta$dataset == "r_salina2"], 10)
+
   for (nm in c("r_salina", "r_salina2")) {
     d <- dats[[nm]]
     lod <- meta$lod[meta$dataset == nm]
-    expect_equal(infer_lod(d), lod)
-    design <- recover_design(d)
-    bound <- lod_bound(lod, design$n_0, design$t)
-    at_lod <- d$sgr[d$density == lod]
-    expect_gt(length(at_lod), 0)
-    expect_equal(unname(at_lod), rep(bound, length(at_lod)), tolerance = 1e-3)
+    # Nothing may be recorded below the limit except a non-detect.
+    expect_lte(lod, min_detected_density(d))
+    # The reporting grid is 10 in both tests, which is what rules out 100 for
+    # r_salina2: a limit of 100 cannot explain recorded densities of 230, 290.
+    pos <- d$density[d$density > 0]
+    expect_true(all(pos %% 10 == 0))
+    expect_false(all(pos %% 100 == 0))
   }
-  expect_equal(meta$lod[meta$dataset == "r_salina"], 10)
-  expect_equal(meta$lod[meta$dataset == "r_salina2"], 100)
+
+  # r_salina is the test where a replicate actually landed on the limit, so
+  # there the bound is directly visible in the data.
+  d <- dats$r_salina
+  design <- recover_design(d)
+  at_lod <- d$sgr[d$density == 10]
+  expect_gt(length(at_lod), 0)
+  expect_equal(unname(at_lod), rep(lod_bound(10, design$n_0, design$t),
+                                   length(at_lod)), tolerance = 1e-3)
+
+  # r_salina2 is the test where none did: its smallest detected density is 100,
+  # well above the limit, so the bound is an extrapolation from the protocol.
+  expect_equal(min_detected_density(dats$r_salina2), 100)
+  expect_equal(sum(dats$r_salina2$density == 10), 0)
 })
 
 test_that("zeros in the Rhodomonas SGR columns are undefined, not measured", {

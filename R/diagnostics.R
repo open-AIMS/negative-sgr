@@ -106,7 +106,7 @@ dataset_summary <- function(dat, meta = dataset_meta()) {
   bnd <- prepare_sgr(dat, "bound", meta = meta)
   gm_bound <- tapply(bnd$y, bnd$x, mean)
   d <- -min(gm_bound)
-  lod_obs <- infer_lod(dat)
+  lod_obs <- min_detected_density(dat)
   mono <- monotonicity(dat)
   data.frame(
     dataset = ds,

@@ -19,7 +19,13 @@ dataset_meta <- function() {
     dataset = dataset_names(),
     species = c("Cladocopium proliferum", "Cladocopium proliferum",
                 "Rhodomonas salina", "Rhodomonas salina"),
-    lod = c(NA, NA, 10, 100),
+    # Both Rhodomonas tests use a counting limit of 10 cells/mL. r_salina2 was
+    # briefly recorded as 100 -- its smallest observed density -- but its
+    # densities include 230 and 290, so the reporting grid is 10 there too and
+    # nothing simply landed between 10 and 100 among its four below-limit rows.
+    # Same species, duration and laboratory as r_salina, where rows sit at
+    # exactly 10. Confirmed as a protocol fact 2026-08-14.
+    lod = c(NA, NA, 10, 10),
     # The density below which a population is extinct, used as the lower end of
     # the interval-censored preparation. 1 cell/mL is a physical floor, not a
     # measured one; it is deliberately conservative, since its only job is to
@@ -95,12 +101,21 @@ lod_bound <- function(lod, n_0, t) {
   (log(lod) - log(n_0)) / t
 }
 
-#' Infer the LOD from the data alone
+#' Smallest detected density
 #'
-#' The smallest non-zero density in a dataset that reached the counting limit is
-#' the limit itself. Returned so the value asserted in `dataset_meta()` can be
-#' checked rather than trusted.
-infer_lod <- function(dat) {
+#' Renamed from `infer_lod()`, which claimed more than this returns. The
+#' smallest *observed* positive density is not the counting limit; it only
+#' bounds it from above, because nothing guarantees any replicate landed at the
+#' limit. Treating the two as the same is what put `r_salina2`'s LOD at 100:
+#' its lowest recorded density is 100, but 230 and 290 also appear, so the
+#' reporting grid is 10 and the single row at 100 is a sample minimum rather
+#' than a floor. `r_salina` is the case where the two do coincide -- three rows
+#' sit at exactly 10, the grid's own floor.
+#'
+#' Use it as a consistency check (`lod <= min_detected_density()`), never as the
+#' source of the LOD. The LOD is a fact about the counting protocol and belongs
+#' in `dataset_meta()`.
+min_detected_density <- function(dat) {
   pos <- dat$density[dat$density > 0]
   if (length(pos) == 0) NA_real_ else min(pos)
 }
