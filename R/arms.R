@@ -44,18 +44,38 @@ arm_prior <- function(x, y, fix_bot = FALSE, model = "nec4param") {
     response = y,
     prior_type = "uninformative"
   )
-  if (fix_bot) {
-    # Edited as a data.frame and re-classed rather than passed through
-    # brms::validate_prior(), which needs a formula and data this function does
-    # not have. brms reads the prior as a data.frame downstream, so the class
-    # attribute is all that has to survive.
-    cls <- class(pr)
-    pr <- as.data.frame(pr)
-    pr$prior[pr$nlpar == "bot"] <- "constant(0)"
-    pr$lb[pr$nlpar == "bot"] <- NA
-    pr$ub[pr$nlpar == "bot"] <- NA
-    class(pr) <- cls
-  }
+  if (fix_bot) pr <- fix_bot_prior(pr)
+  pr
+}
+
+#' Replace an existing prior's `bot` with a point mass at zero
+#'
+#' Split out of `arm_prior()` so that arms B2/B3 can take *the prior they were
+#' given* and pin `bot`, rather than deriving a fresh one from their own data.
+#'
+#' That distinction is not cosmetic. brms writes prior constants into the Stan
+#' program as literals, so a prior rebuilt per dataset makes the program unique
+#' and forces a 3-5 minute recompile for every fit. `fit_arm()` used to call
+#' `arm_prior(adat$x, adat$y, fix_bot = TRUE)`, which meant B2 and B3 kept
+#' recompiling through the Phase 5 sweep even with the prior otherwise held
+#' fixed -- 18 workers each running a 1.2 GB `cc1plus` is what pinned the
+#' machine at 29 of 31 GB.
+#'
+#' Behaviour is unchanged for Phase 3: arms A and B2 take the same preparation
+#' there, so the prior derived from B2's data was already identical to the one
+#' passed in.
+#'
+#' Edited as a data.frame and re-classed rather than passed through
+#' `brms::validate_prior()`, which needs a formula and data this function does
+#' not have. brms reads the prior as a data.frame downstream, so the class
+#' attribute is all that has to survive.
+fix_bot_prior <- function(prior) {
+  cls <- class(prior)
+  pr <- as.data.frame(prior)
+  pr$prior[pr$nlpar == "bot"] <- "constant(0)"
+  pr$lb[pr$nlpar == "bot"] <- NA
+  pr$ub[pr$nlpar == "bot"] <- NA
+  class(pr) <- cls
   pr
 }
 
@@ -68,13 +88,16 @@ arm_prior <- function(x, y, fix_bot = FALSE, model = "nec4param") {
 #' `init` is supplied in `brm_args`, so arms B2/B3 supply their own: drawn from
 #' the *free* prior for the sampled parameters, with `b_bot` omitted because
 #' Stan does not declare a constant parameter.
-fixed_bot_inits <- function(x, y, chains, model = "nec4param", seed = NULL) {
+fixed_bot_inits <- function(x, y, chains, model = "nec4param", seed = NULL,
+                            prior_free = NULL) {
   # Inits are drawn against a prior in which `bot` is a point mass at 0 rather
   # than the free prior, so that the curve whose predictions get accepted or
   # rejected is the one actually being fitted. `make_good_inits()` rejects draws
   # whose predicted curve leaves the range of the response, which is what stops
   # a negative `top` reaching the sampler.
-  pseudo <- as.data.frame(arm_prior(x, y, fix_bot = FALSE, model = model))
+  pseudo <- as.data.frame(
+    if (is.null(prior_free)) arm_prior(x, y, fix_bot = FALSE, model = model)
+    else prior_free)
   pseudo$prior[pseudo$nlpar == "bot"] <- "normal(0, 1e-8)"
   pseudo$lb[pseudo$nlpar == "bot"] <- NA
   pseudo$ub[pseudo$nlpar == "bot"] <- NA
@@ -158,15 +181,20 @@ fit_arm <- function(arm, dat, prior, crossing = NULL, mcmc = MCMC,
   # through `...`. Passing a list(brm_args = ...) silently reaches brm() as one
   # unused named argument, so chains, backend and init all revert to defaults
   # without any warning. Hence do.call over a flat list.
+  prior_free <- prior
   args <- list(formula = form, data = adat, family = fam,
                chains = mcmc$chains, iter = mcmc$iter, warmup = mcmc$warmup,
                seed = mcmc$seed, backend = "cmdstanr",
                control = list(adapt_delta = mcmc$adapt_delta,
                               max_treedepth = mcmc$max_treedepth))
   if (fix_bot) {
-    prior <- arm_prior(adat$x, adat$y, fix_bot = TRUE, model = model)
+    # Pin `bot` in the prior we were GIVEN. Deriving a fresh one here would make
+    # the Stan program unique to this dataset and force a recompile -- see
+    # `fix_bot_prior()`. Inits may stay data-derived: they are passed as values,
+    # not compiled into the program, so they cost nothing in cache terms.
+    prior <- fix_bot_prior(prior)
     args$init <- fixed_bot_inits(adat$x, adat$y, mcmc$chains, model,
-                                 seed = mcmc$seed)
+                                 seed = mcmc$seed, prior_free = prior_free)
   }
   if (!identical(arm, "SQ")) args$prior <- prior
 
