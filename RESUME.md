@@ -115,6 +115,32 @@ branch goes anywhere.
    provenance formality rather than an open risk.
 6. **Paper artefacts** — not started.
 
+## Plan file needs revision 4
+
+`../bayesnec/ignore/negative-sgr-study-plan.md` is at revision 3 and now carries
+three statements known to be wrong. Revision 3 is backed up at
+`../bayesnec/superceded/negative-sgr-study-plan-rev3.md`. To change:
+
+1. **`r_salina2`'s LOD is 10, not 100** (the revision-3 header states 100). Its
+   `d` lower bound moves from >= 1.147 to >= 1.915, so its `Delta` rises and the
+   pre-registered `Delta` ordering may no longer read
+   `c_proliferum > c_proliferum2 > r_salina > r_salina2`. **Recompute from the
+   rebuilt `analysis/dataset_summary.csv` before rewriting the ordering** --
+   do not hand-edit the number.
+2. **"If divergence instead orders by `R`, the mechanism above is wrong."** That
+   test cannot be run: on the growth-rate scale `R` has no path to any endpoint.
+   The plan's requirement that "the simulation must carry `R` and `Delta` as
+   separate factors" is only satisfiable by making `R` a signal-to-noise axis,
+   which is what `sigma_mode = "absolute"` now does. State this as a result.
+3. **The revision-3 header still says the vignette target is `example6`, not
+   `example1`.** That claim was withdrawn on 2026-08-12 (it was read off
+   `cens-impl`, which predates the commit adding the section to `example1`) but
+   the header was never corrected.
+
+Also worth folding in: arm D is degenerate wherever the design does not reach
+the zero crossing (all `top_factor = 0.8` cells), and the simulation now holds
+the prior fixed within a cell.
+
 ## Environment notes
 
 - Pinned to `bayesnec` `dev` @ `374e511c`, loaded from
