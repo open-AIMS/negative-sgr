@@ -247,6 +247,19 @@ only the three R cells change. Across the sweep the control CV now falls 9.6% ->
 6.7% -> 2.8% -> 1.9% as `R` goes 2.3 -> 3.3 -> 17 -> 73, and `f_neg` falls 0.171
 -> 0.143. `f_neg` is now recorded per iteration as the mediating quantity.
 
+**The R axis is a noise axis, and should be reported as one.** Under the
+absolute-sigma parameterisation, varying `R` at fixed `sigma_0` is exactly the
+same manipulation as varying `sigma_0` at fixed `R`, up to an overall rescaling
+of the response -- the model only ever sees the ratio. So the sweep does not
+test "does the control fold-change matter?" in any richer sense; it tests
+signal-to-noise, and `R` is one of the two things that sets it. That is the
+honest reading, and it is the interesting one: it means a claim like "high-R
+tests resist flooring bias" is the same claim as "precise tests resist flooring
+bias", and TG 201's `R >= 16` validity criterion is buying noise control rather
+than anything specific to growth. Anything stronger than that would need `R` to
+enter the mean function independently, which on the growth-rate scale it does
+not.
+
 Note that `f_neg` moves much less than the CV does. Most negative observations
 come from the region where the true mean is genuinely below zero, and that region
 is fixed by the design, which is scale-invariant. What `R` changes is how
