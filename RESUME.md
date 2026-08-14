@@ -11,13 +11,13 @@ the layout and how to run each phase.
 | Plan review | **done** — plan at revision 3, `../bayesnec/ignore/negative-sgr-study-plan.md` |
 | 1 branch verification | **done** — six gates pass on `dev`, `analysis/phase1_gates.csv` |
 | 2 diagnostics | **done** — `analysis/dataset_summary.csv`, three figures |
-| 3 arms on real data | **done** — 36 fits, `analysis/phase3_*.csv` |
+| 3 arms on real data | **REBUILDING** — LOD correction, full re-run launched 08:10 |
 | 4 `bot` prior sensitivity | **partly done** — contraction table done; the prior *sweep* is **not** run |
 | 5 simulation | **RUNNING** — `rsep`, 240 iterations, 18 workers, launched 07:51 |
-| 6 vignette | **done, unmerged** — branch `negsgr-cens-vignette` |
+| 6 vignette | **done, parked** — branch `negsgr-cens-vignette`, not for `dev` yet |
 | 6 paper artefacts | **not started** |
 
-121 tests pass (`tests/testthat/`).
+125 tests pass (`tests/testthat/`).
 
 ## What is running
 
@@ -60,16 +60,25 @@ core cells are numerically unchanged. Full argument in `SESSION.md`.
 Interpret the R axis as a **signal-to-noise axis**: varying `R` at fixed `sigma_0`
 is the same manipulation as varying `sigma_0` at fixed `R`.
 
-## Decisions waiting for you
+## Decisions taken 2026-08-14
 
-1. **`r_salina2`'s detection limit — 10 or 100?** This study asserts 100; the
-   evidence now favours 10, which would move that dataset's bound from -1.147 to
-   -1.915 and change four of seven arms on it. It is a protocol fact, not a data
-   fact, so it has not been changed. Full argument in `SESSION.md`. Cost of
-   adopting: re-run the `r_salina2` column of Phase 3 only.
-2. **Whether the `negsgr-cens-vignette` branch should go to `dev` as a PR**, or
-   wait and fold into the `example7` rewrite (#193). #193 is blocked on #191, the
-   vignette subsection is not, so they can go separately.
+1. **Both Rhodomonas detection limits are 10** (protocol-confirmed). `r_salina2`
+   was recorded at 100 on the smallest-observed-density reasoning, which bounds
+   the limit rather than identifying it. Its bound moves -1.147 -> **-1.915**.
+   `infer_lod()` is renamed `min_detected_density()` to stop the mistake
+   recurring. **Phase 3 is being rebuilt in full** (`dataset_meta()` feeds every
+   target, so `targets` invalidated all of them; that also keeps the table on one
+   code path). Log: `analysis/phase3_run_lod10.log`.
+2. **Nothing goes to `dev` for now.** The vignette work stays parked on
+   `negsgr-cens-vignette` (worktree `/mnt/c/Rworking/bayesnec-negsgr`), unmerged
+   and un-PRed, to be revisited alongside the `example7` rewrite (#193).
+
+**Check after the rebuild:** the vignette quotes `r_salina` `bot` values
+(-1.985 / -5.64 / -2.45 and contractions 0.996 / 0.379 / 0.953). `r_salina`'s LOD
+is unchanged and the seeds are fixed, so these should reproduce -- but they came
+from the pre-rebuild table and must be re-checked against the new
+`analysis/phase3_parameters.csv` and `phase4_bot_contraction.csv` before that
+branch goes anywhere.
 
 ## Results so far (Phase 3, unchanged)
 
@@ -93,14 +102,17 @@ is the same manipulation as varying `sigma_0` at fixed `R`.
 
 ## Open items, roughly in order
 
-1. **Phase 5 report** once the sweep lands — `analysis/phase5_report.R`.
-2. **Phase 4 prior sweep** — 3 fits, deferred only because the machine is busy.
-3. **Merge or park the vignette branch** (decision 2 above).
+1. **Re-run `analysis/phase3_report.R`** once the rebuild finishes, and diff the
+   tables against the pre-LOD versions — `r_salina2` should move, nothing else
+   should.
+2. **Phase 5 report** once the sweep lands — `analysis/phase5_report.R`.
+3. **Phase 4 prior sweep** — 3 fits, deferred only because the machine is busy.
 4. **`renv.lock` not written** — deferred again, since `renv::init()` writes a
    `.Rprofile` and a sweep is running. Do it when the machine is idle.
-5. **Protocol confirmation** — `mu_0`, `t`, `n_0` and both LODs are recovered
-   arithmetically and reproduce exactly, but have not been checked against the
-   test protocols. Decision 1 above is the sharp end of this.
+5. **Protocol confirmation** — both LODs are now confirmed (decision 1).
+   `mu_0`, `t` and `n_0` are still recovered arithmetically rather than read from
+   the protocols; they reproduce the supplied SGR column exactly, so this is a
+   provenance formality rather than an open risk.
 6. **Paper artefacts** — not started.
 
 ## Environment notes
