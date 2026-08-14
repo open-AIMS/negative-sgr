@@ -267,6 +267,76 @@ is fixed by the design, which is scale-invariant. What `R` changes is how
 results is therefore not "high R produces fewer negatives" but "high R produces
 well-determined negatives, so discarding them destroys more information".
 
+## The first Phase 5 sweep failed silently, and why that nearly went unnoticed
+
+2026-08-14. The sweep was launched at 240 iterations x 12 cells and its first
+cell reported `[done] ... 113.2 min 239 worker failures`. One iteration in 240
+survived. Two independent faults, plus a reporting fault that would have hidden
+both.
+
+**Fault 1: the arm D branch.** `zero_crossing()` returns `Inf` when the fitted
+curve never reaches zero growth inside the tested range. The branch read
+
+```r
+f <- if (inherits(xc, "try-error") || !is.finite(xc)) xc else try(fit_arm("D", ...))
+if (inherits(f, "try-error")) { ...record failure... } else { dgn <- fit_diagnostics(f$fit) ... }
+```
+
+For the non-finite case `f` is assigned a bare `Inf`, and `inherits(Inf,
+"try-error")` is `FALSE`, so control reaches `f$fit` and the worker dies with
+`$ operator is invalid for atomic vectors`. The `top_factor = 0.8` cells place
+the top concentration *below* the true zero crossing by construction, so `Inf`
+is the expected return there rather than an edge case, and every iteration died
+after completing five of six fits -- which is why the cell burned 113 minutes to
+produce nothing. Iteration 86 survived only because its noise put the fitted
+crossing inside the range.
+
+The fix follows what `zero_crossing()` already documents: with no crossing in
+range, `truncate_at_crossing(dat, Inf)` keeps every row, so arm D *is* arm A.
+It is now reported as arm A's result with a flag, which is both correct and
+skips the study's most expensive fit exactly where it is redundant.
+
+This bug predates the session. The pilot did not hit it because of which cells
+it ran.
+
+**Fault 2: every fit recompiled.** `bnec()`'s gaussian priors are functions of
+the response -- `normal(quantile(y, 0.9), 2.5 * sd(y))` for `top` and likewise
+for `bot` -- and brms writes those constants into the Stan program as literals.
+Two datasets from the same cell therefore compile to different model hashes.
+Measured: **40 simulated datasets gave 40 distinct prior strings**, with only
+the `beta` and `nec` priors constant (they depend on `x`, which the design
+fixes). At 3-5 minutes a compile this makes a 17,280-fit sweep impossible, and
+it is what exhausted the machine: 18 forked workers each meeting an uncompiled
+model means 18 concurrent C++ compiles at roughly 1.5 GB apiece on a 31 GB box.
+One cell left **1805 files and 2.6 GB** in the compile cache.
+
+The prior is now held fixed within a cell, built from a reference dataset whose
+seed no analysis iteration uses, and the cache is warmed serially before
+forking. That is ~3 distinct programs per cell (A/B1/D share one, B2/B3 share
+one, C one) instead of one per fit. `PRIOR_MODE = "per_iteration"` restores the
+faithful behaviour, and `analysis/phase5_prior_check.R` measures the difference
+rather than assuming it away.
+
+**Fault 3, the one worth remembering: the failures were counted and discarded.**
+
+```r
+bad <- vapply(res, inherits, logical(1), "try-error")
+res <- do.call(rbind, res[!bad])
+```
+
+`mclapply()` returns errors as `try-error` objects rather than printing them, so
+nothing appeared in the log -- the whole 651 KB of it contains no error text at
+all. The cell was then written to disk and announced as `[done]`. Had the
+failure count not been printed alongside it, twelve near-empty cells would have
+produced a clean-looking summary with 1/240 of the intended Monte Carlo sample,
+and the coverage numbers would have been quoted with an MCSE computed from an
+`n` that did not exist. Failures are now printed, written to
+`<cell>.failures.txt`, and a cell with no surviving iterations is not written.
+
+**Verification.** The same cell that took 113.2 minutes and lost 239 of 240
+iterations now completes in **1.5 minutes with 0 failures**, with arm D
+correctly reporting arm A's estimate and the flag.
+
 ## Change log
 
 | date | change |
@@ -276,6 +346,7 @@ well-determined negatives, so discarding them destroys more information".
 | 2026-08-12 | Arm C measured, arm C2 added; plan revision 3. Phase 3 pipeline rerun from scratch. |
 | 2026-08-12 | Repinned from `cens-impl` to `dev` after finding the Censoring section had moved into `example1` in a commit `cens-impl` predates. Phase 1 re-verified (identical), Phase 3 restarted. |
 | 2026-08-13 | Arm C2 non-convergence on `r_salina` traced to one stuck chain and fixed by a general refit-once-on-Rhat rule in `fit_arm()`; Phase 3 re-run (1h25m) so every fit comes from one code path. Simulation truth recalibrated from the arm-A posterior after the hand-picked values proved to be a near-step curve. Phase 5 pilot and budget complete. Session paused; see `RESUME.md`. |
+| 2026-08-14 | First Phase 5 sweep failed (239/240 per cell); arm D `Inf` branch and per-fit recompilation both fixed. |
 | 2026-08-14 | `r_salina2` LOD corrected 100 -> 10 (protocol-confirmed); Phase 3 rebuilt. Scale-equivariance in `R` found and fixed before the sweep (`sigma_mode`, `sigma_0_at()`); `STUDY_CORES` raised to 18; Phase 5 `rsep` sweep launched at 240 iterations per cell. |
 
 ## Resolved: both Rhodomonas detection limits are 10, not 10 and 100
