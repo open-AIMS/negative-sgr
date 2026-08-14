@@ -121,12 +121,12 @@ Full table in `analysis/dataset_summary.csv`; tests in
   `c_proliferum` and `r_salina` and `> 0.99999` on the other two, so the supplied
   SGR column was computed deterministically from those densities and a single
   inoculum density. `t` = 7, 7, 3, 3 d; `n_0` = 7968, 8684, 3871, 3123 cells/mL.
-- **The two LODs were taken to differ**: 10 cells/mL for `r_salina`, 100 for
-  `r_salina2`. Each bound (`(ln LOD - ln n_0)/t` = -1.9862 and -1.1470) equals
-  the SGR of the lowest detected row to all printed digits. **The `r_salina2`
-  value is now in doubt** -- that arithmetic only shows the lowest row sits at
-  the assumed limit, which is true of any assumed limit chosen this way. See
-  "Open: `r_salina2`'s detection limit is probably 10, not 100" below.
+- **Both LODs are 10 cells/mL**, confirmed against the counting protocol on
+  2026-08-14. They were initially taken to be 10 and 100, on the reasoning that
+  the lowest detected row in each test sits exactly at the implied bound -- which
+  is true of any limit chosen that way, and so is not evidence. `r_salina`'s
+  bound is -1.9862 and `r_salina2`'s is **-1.9145** (not -1.1470). See
+  "Resolved: both Rhodomonas detection limits are 10" below.
 - **Every zero in the two *Rhodomonas* SGR columns is a zero cell density**,
   where SGR is undefined rather than zero. The *Cladocopium* sets have none.
 - **The supplied CSVs are not fully floored.** The labs substituted 0 for the
@@ -276,13 +276,14 @@ well-determined negatives, so discarding them destroys more information".
 | 2026-08-12 | Arm C measured, arm C2 added; plan revision 3. Phase 3 pipeline rerun from scratch. |
 | 2026-08-12 | Repinned from `cens-impl` to `dev` after finding the Censoring section had moved into `example1` in a commit `cens-impl` predates. Phase 1 re-verified (identical), Phase 3 restarted. |
 | 2026-08-13 | Arm C2 non-convergence on `r_salina` traced to one stuck chain and fixed by a general refit-once-on-Rhat rule in `fit_arm()`; Phase 3 re-run (1h25m) so every fit comes from one code path. Simulation truth recalibrated from the arm-A posterior after the hand-picked values proved to be a near-step curve. Phase 5 pilot and budget complete. Session paused; see `RESUME.md`. |
-| 2026-08-14 | `r_salina2` LOD queried (10 vs 100), pending protocol confirmation. Scale-equivariance in `R` found and fixed before the sweep (`sigma_mode`, `sigma_0_at()`); `STUDY_CORES` raised to 18; Phase 5 `rsep` sweep launched at 240 iterations per cell. |
+| 2026-08-14 | `r_salina2` LOD corrected 100 -> 10 (protocol-confirmed); Phase 3 rebuilt. Scale-equivariance in `R` found and fixed before the sweep (`sigma_mode`, `sigma_0_at()`); `STUDY_CORES` raised to 18; Phase 5 `rsep` sweep launched at 240 iterations per cell. |
 
-## Open: `r_salina2`'s detection limit is probably 10, not 100
+## Resolved: both Rhodomonas detection limits are 10, not 10 and 100
 
 Found 2026-08-14 while cross-checking against the package's shipped `alga`
-dataset, which is these same four tests. **This changes a Phase 3 result and
-needs protocol confirmation before it is either adopted or dismissed.**
+dataset, which is these same four tests, and **confirmed the same day against
+the counting protocol**: both tests use a limit of 10 cells/mL. `dataset_meta()`
+now carries `lod = c(NA, NA, 10, 10)` and Phase 3 was rebuilt in full.
 
 `dataset_meta()` asserts `lod = c(NA, NA, 10, 100)`, and `infer_lod()` "checks"
 it as the smallest positive recorded density. That is not an independent check --
@@ -310,10 +311,24 @@ interval's upper end, so four of the seven arms move on that dataset. The nine
 `c_proliferum` fits and the whole simulation are unaffected -- the simulation
 uses `sim_meta()`, where `lod` is `NA`.
 
-Not changed unilaterally, because it is a fact about the counting protocol rather
-than about the data, and the protocols have not yet been consulted (see the
-standing protocol item in `RESUME.md`). The cost of adopting it is a re-run of
-the `r_salina2` column of Phase 3, not of the whole pipeline.
+**What was done.** `r_salina2`'s bound moves from -1.147 to **-1.915**, applied
+to its four below-limit rows. `infer_lod()` is renamed `min_detected_density()`,
+because the smallest observed positive density bounds the counting limit from
+above rather than identifying it, and the old name invited exactly this mistake.
+The test that asserted `lod == infer_lod(d)` -- and described that as
+confirmation "without needing the protocol", which is the same inference twice --
+now asserts consistency (`lod <= min_detected_density(d)`) plus the grid
+argument. Since `dataset_meta()` feeds every target, the whole of Phase 3 was
+rebuilt rather than the `r_salina2` column alone, keeping the table on one code
+path.
+
+**The general lesson, worth carrying into the paper.** A detection limit is a
+property of the measuring procedure, not of the measurements. Any dataset in
+which the limit is inferred from the data will place it at the smallest value
+that happened to be recorded, which is biased high whenever no replicate reached
+the limit -- and biased high in exactly the direction that makes the censored
+region look shallower and the substituted bound look less extreme. This study
+made that error on its own data before finding it.
 
 Note the package's own `notes/alga_dataset.md` states a single counting
 resolution of 10 for the dataset and gives one bound formula using it, which is
