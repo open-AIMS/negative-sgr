@@ -25,15 +25,43 @@ fits <- tar_read(all_fits)
 xmax <- do.call(rbind, lapply(unlist(fits, recursive = FALSE), function(a) {
   if (is.null(a$fit)) return(NULL)
   data.frame(dataset = a$dataset, arm = a$arm,
+             x_min = min(a$fit$fit$data$x),
              x_max = max(a$fit$fit$data$x), stringsAsFactors = FALSE)
 }))
 ep <- merge(ep, xmax, by = c("dataset", "arm"), all.x = TRUE)
-ep$at_boundary <- !is.na(ep$x_max) & abs(ep$estimate - ep$x_max) < 1e-6 &
-  (ep$upper - ep$lower) < 1e-6
+## An estimate or interval endpoint sitting at either end of the evaluation
+## grid is a boundary artefact, not a measurement: `ecx()` searches
+## `seq(min(x_range), max(x_range), length = resolution)` and returns the
+## closest grid point, so a curve that never reaches the target simply returns
+## the nearest edge.
+##
+## The previous rule tested the UPPER end only, and additionally required a
+## zero-width interval. Both conditions failed on r_salina2 arm B2, whose ErC10
+## came back as the grid floor with an interval spanning most of the design
+## (0.01 [0.01, 135]) and was reported as `usable`. Flag either end, and do not
+## require the interval to be degenerate -- a boundary-pinned point estimate
+## with a wide interval is precisely the pathological case.
+##
+## Tolerance is relative to the design span rather than absolute, so it does not
+## depend on the grid's internal spacing.
+ep$design_span <- ep$x_max - ep$x_min
+btol <- 1e-4 * ep$design_span
+ep$at_lower <- !is.na(ep$x_min) & ep$estimate <= ep$x_min + btol
+ep$at_upper <- !is.na(ep$x_max) & ep$estimate >= ep$x_max - btol
+ep$at_boundary <- ep$at_lower | ep$at_upper
+## An interval running to a grid edge is truncated by the search range rather
+## than by the data, so the reported uncertainty is a floor, not an estimate.
+ep$interval_at_boundary <- !is.na(ep$x_min) &
+  (ep$lower <= ep$x_min + btol | ep$upper >= ep$x_max - btol)
+## And an interval covering most of the tested range means the data barely
+## constrain the endpoint, whatever the point estimate looks like.
+ep$interval_spans_design <- !is.na(ep$design_span) & ep$design_span > 0 &
+  (ep$upper - ep$lower) / ep$design_span > 0.8
 dg_key <- dg[, c("dataset", "arm", "max_rhat", "divergences")]
 ep <- merge(ep, dg_key, by = c("dataset", "arm"), all.x = TRUE)
 ep$not_converged <- !is.na(ep$max_rhat) & ep$max_rhat > 1.05
-ep$usable <- !ep$at_boundary & !ep$not_converged
+ep$usable <- !ep$at_boundary & !ep$not_converged &
+  !ep$interval_at_boundary & !ep$interval_spans_design
 
 arm_order <- c("A", "A_raw_dropped", "B1", "B2", "B3", "C", "C2", "D", "SQ")
 ep$arm <- factor(ep$arm, levels = arm_order)
@@ -53,7 +81,9 @@ for (ds in dataset_names()) {
     s <- sub[sub$endpoint == en, ]
     cat(sprintf("  %-6s ", en))
     lab <- ifelse(s$at_boundary, " [NOT ESTIMABLE in range]",
-                  ifelse(s$not_converged, " [DID NOT CONVERGE]", ""))
+           ifelse(s$not_converged, " [DID NOT CONVERGE]",
+           ifelse(s$interval_at_boundary, " [INTERVAL TRUNCATED by range]",
+           ifelse(s$interval_spans_design, " [INTERVAL SPANS DESIGN]", ""))))
     cat(paste0(sprintf("%s: %.4g [%.4g, %.4g]", s$arm, s$estimate, s$lower,
                        s$upper), lab, collapse = "  |  "), "\n")
   }
@@ -66,7 +96,9 @@ for (ds in dataset_names()) {
 ## agree" means operationally.
 cat("\n===== UNUSABLE RESULTS (excluded from the gate) =====\n")
 unusable <- ep[!ep$usable, c("dataset", "arm", "endpoint", "estimate",
-                             "at_boundary", "not_converged", "max_rhat")]
+                             "lower", "upper", "at_boundary",
+                             "interval_at_boundary", "interval_spans_design",
+                             "not_converged", "max_rhat")]
 if (nrow(unusable)) print(unusable, digits = 4, row.names = FALSE) else
   cat("none\n")
 
