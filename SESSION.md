@@ -337,6 +337,62 @@ and the coverage numbers would have been quoted with an MCSE computed from an
 iterations now completes in **1.5 minutes with 0 failures**, with arm D
 correctly reporting arm A's estimate and the flag.
 
+## NSEC cannot be reported as a coverage result against the true `nec`
+
+Found 2026-08-15/16 in the Phase 5 sweep. **This retires a planned output.**
+
+The study takes NSEC's estimand to be the true `nec`, on the reasoning that NSEC
+is an alternative estimator of a no-effect concentration and converges on the
+threshold as the design grows. The estimand check confirms the limit is right:
+at negligible noise NSEC returns **1.2985 against a true `nec` of 1.3**.
+
+At realistic noise it is not close, and the gap widens with design width:
+
+| cell | NSEC coverage, by arm |
+|---|---|
+| `d2.0_t2.0` | A 0.000, B1 0.004, B2 0.000, B3 0.000, C 0.004, D 0.004 |
+| `d4.0_t2.0` | A 0.092, B1 0.167, B2 0.000, B3 0.079, C 0.354, D 0.312 |
+
+Bias in the first of those runs from +120% to +266% of the true `nec`, on every
+arm including arm A. A nominal 95% interval covering the target in 0 of 240
+iterations is not a degraded coverage figure; it means the interval and the
+target are not about the same quantity at this noise level.
+
+The cause is not flooring -- it is shared across all six arms -- and it is not
+the estimator being broken. NSEC is defined against the *posterior spread of the
+control response*, so what it identifies depends on how precisely the control is
+estimated and on how much of the curve the design covers. `nec` is its limit, not
+its expectation.
+
+**Consequence.** Absolute NSEC bias and coverage against `nec` must not be
+reported. NSEC survives in this study only as an **arm-to-arm contrast**, where
+the shared design component cancels, and the contrast must be presented with the
+shared bias stated so no reader mistakes it for an unbiased threshold estimate.
+The plan's NSEC coverage output is withdrawn.
+
+The same caution does not apply to ErC10 and ErC50: the estimand check matches
+`ecx()` to `true_ecx()` within 0.006 at negligible noise, and arm A reaches
+coverage of 0.938-0.954 in the cells where `bot` is identified.
+
+## The flooring effect is regime-dependent
+
+Provisional at 8 of 12 cells, but consistent enough to record.
+
+| design | `f_neg` | arm A ErC50 | B1 ErC50 | reading |
+|---|---|---|---|---|
+| `t0.8` (top below crossing) | 0.003-0.017 | -3.4 to -3.6% | -1.9 to -3.3% | arms indistinguishable |
+| `t1.0` (top at crossing) | ~0.042 | -4.4 to -4.9% | -1.6 to -2.8% | arms close, B1 no worse |
+| `t2.0`, delta 4 | high | **-0.3%, cover 0.938** | **-5.5%, cover 0.696** | **A clearly best** |
+
+Flooring is close to harmless where the design barely reaches zero growth, and
+materially biasing once it extends well past the crossing with a deep asymptote.
+An early reading of the narrow cells alone suggested B1 *beat* arm A, which was
+an artefact of those cells having almost nothing to floor; it is withdrawn.
+
+Note also that B2's coverage can look good for the wrong reason -- 0.967 in
+`d4.0_t2.0` on a bias of -10% -- because its intervals are enormous. Coverage
+must be read alongside bias and interval width, never alone.
+
 ## Change log
 
 | date | change |
@@ -346,6 +402,7 @@ correctly reporting arm A's estimate and the flag.
 | 2026-08-12 | Arm C measured, arm C2 added; plan revision 3. Phase 3 pipeline rerun from scratch. |
 | 2026-08-12 | Repinned from `cens-impl` to `dev` after finding the Censoring section had moved into `example1` in a commit `cens-impl` predates. Phase 1 re-verified (identical), Phase 3 restarted. |
 | 2026-08-13 | Arm C2 non-convergence on `r_salina` traced to one stuck chain and fixed by a general refit-once-on-Rhat rule in `fit_arm()`; Phase 3 re-run (1h25m) so every fit comes from one code path. Simulation truth recalibrated from the arm-A posterior after the hand-picked values proved to be a near-step curve. Phase 5 pilot and budget complete. Session paused; see `RESUME.md`. |
+| 2026-08-16 | NSEC coverage against `nec` withdrawn as an output; flooring effect found to be regime-dependent. |
 | 2026-08-14 | First Phase 5 sweep failed (239/240 per cell); arm D `Inf` branch and per-fit recompilation both fixed. |
 | 2026-08-14 | `r_salina2` LOD corrected 100 -> 10 (protocol-confirmed); Phase 3 rebuilt. Scale-equivariance in `R` found and fixed before the sweep (`sigma_mode`, `sigma_0_at()`); `STUDY_CORES` raised to 18; Phase 5 `rsep` sweep launched at 240 iterations per cell. |
 
