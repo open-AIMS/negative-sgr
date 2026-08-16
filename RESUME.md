@@ -1,8 +1,33 @@
 # Resume here
 
-Updated 2026-08-14. **A sweep is running** — see below before starting anything
-that wants cores. `SESSION.md` holds provenance and findings; `README.md` holds
-the layout and how to run each phase.
+Updated 2026-08-16 11:20. **Safe to power off at any time.** The sweep writes one
+`.rds` per cell atomically when that cell finishes, so a completed cell cannot be
+damaged and an interrupted cell is simply recomputed. Nothing else is running.
+
+## To restart after power-on
+
+```bash
+cd /mnt/c/Rworking/negative-sgr
+DESIGN=rsep N_ITER=240 WORKERS=18 nohup Rscript analysis/phase5_run.R \
+  > analysis/phase5_run.log 2>&1 &
+```
+
+Completed cells are skipped automatically. As of shutdown **10 of 12 cells are
+done**; cells `d4.0_t2.0_R17.0_s8.1` and `d4.0_t2.0_R73.0_s8.1` remain, about
+3.5 h each on 18 workers.
+
+**These two cells are optional.** They extend the R axis only, and `R` is now
+known to be a pure signal-to-noise sweep rather than a test of control
+fold-change (the generating model is exactly scale-equivariant in the growth
+rate). Two of the four R points are already in. Every primary finding is
+complete without them. Skip them if the machine is needed for something else.
+
+Verify the sweep is genuinely running, rather than trusting a launch message:
+
+```bash
+pgrep -fc "phase5_run[.]R"          # expect ~20
+stat -c %y analysis/phase5_run.log  # should be seconds old
+```
 
 ## State
 
@@ -11,9 +36,9 @@ the layout and how to run each phase.
 | Plan review | **done** — plan at revision 3, `../bayesnec/ignore/negative-sgr-study-plan.md` |
 | 1 branch verification | **done** — six gates pass on `dev`, `analysis/phase1_gates.csv` |
 | 2 diagnostics | **done** — `analysis/dataset_summary.csv`, three figures |
-| 3 arms on real data | **REBUILDING** — LOD correction, full re-run launched 08:10 |
+| 3 arms on real data | **done** — rebuilt post-LOD, no errors, boundary flags corrected |
 | 4 `bot` prior sensitivity | **partly done** — contraction table done; the prior *sweep* is **not** run |
-| 5 simulation | **RUNNING** — `rsep`, 240 iterations, 18 workers, launched 07:51 |
+| 5 simulation | **10 of 12 cells done**, 0 worker failures across ~14,400 fits; 2 optional R cells left |
 | 6 vignette | **done, parked** — branch `negsgr-cens-vignette`, not for `dev` yet |
 | 6 paper artefacts | **not started** |
 
