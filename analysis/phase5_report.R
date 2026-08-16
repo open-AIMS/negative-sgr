@@ -31,7 +31,19 @@ cat("\nfits excluded for divergences or Rhat > 1.01:",
 cat("per arm:\n")
 print(round(tapply(res$ok & !converged, res$arm, mean, na.rm = TRUE), 4))
 
-use <- res[which(converged), ]
+## Metrics are computed on ALL successful fits, not only the clean ones.
+##
+## Filtering on `divergences == 0` conditions on an OUTCOME that differs
+## systematically by arm: arm A averages ~0 divergences while B2 averages 4-6,
+## so the filter would retain nearly all of A and only the best-behaved B2 fits,
+## flattering the arm the study finds worst. The exclusion rates above are the
+## finding; applying them as a filter would hide it.
+##
+## Both versions are produced. `mets` is the headline (all successful fits);
+## `mets_clean` is the sensitivity analysis. Where they disagree, the
+## disagreement is reported rather than resolved by preferring one.
+use <- res[which(res$ok & !is.na(res$estimate)), ]
+use_clean <- res[which(converged), ]
 
 ## -------------------------------------------------------------- metrics -----
 cat("\n===== BIAS, RMSE, COVERAGE (with MCSE) =====\n")
@@ -45,10 +57,48 @@ mets <- do.call(rbind, lapply(split(use, key, drop = TRUE), function(s) {
 }))
 rownames(mets) <- NULL
 mets$rel_bias <- mets$bias / mets$truth
+## f_neg is the mediating quantity -- the fraction of responses the convention
+## actually discards -- so every table carries it.
+fn <- aggregate(f_neg ~ cell, use, mean)
+mets <- merge(mets, fn, by = "cell", all.x = TRUE)
 utils::write.csv(mets, "analysis/phase5_metrics.csv", row.names = FALSE)
+
+## Sensitivity: the same metrics on clean fits only.
+key_c <- list(use_clean$cell, use_clean$arm, use_clean$endpoint)
+mets_clean <- do.call(rbind, lapply(split(use_clean, key_c, drop = TRUE),
+  function(s) {
+    m <- mcse_summary(s$estimate, s$truth[1], s$lower, s$upper)
+    cbind(cell = s$cell[1], arm = as.character(s$arm[1]),
+          endpoint = s$endpoint[1], m)
+  }))
+rownames(mets_clean) <- NULL
+utils::write.csv(mets_clean, "analysis/phase5_metrics_cleanfits.csv",
+                 row.names = FALSE)
+
+cat("\n===== ALL-FITS vs CLEAN-FITS SENSITIVITY (ErC50) =====\n")
+cmp <- merge(mets[mets$endpoint == "ErC50", c("cell", "arm", "bias", "n")],
+             mets_clean[mets_clean$endpoint == "ErC50",
+                        c("cell", "arm", "bias", "n")],
+             by = c("cell", "arm"), suffixes = c(".all", ".clean"))
+cmp$bias_shift <- cmp$bias.clean - cmp$bias.all
+cmp$dropped <- cmp$n.all - cmp$n.clean
+byarm <- aggregate(cbind(dropped, bias_shift) ~ arm, cmp, mean)
+cat("Mean fits dropped per cell, and how much dropping them moves the bias:\n")
+print(byarm, digits = 3, row.names = FALSE)
+cat("A large `dropped` with a large `bias_shift` means the convergence filter\n",
+    "is doing the arm a favour; report the all-fits number.\n")
 
 for (en in c("ErC10", "ErC50", "NSEC")) {
   cat("\n--", en, "--\n")
+  if (en == "NSEC") {
+    cat("!! NSEC bias and coverage against the true `nec` are WITHDRAWN as\n",
+        "   study outputs. NSEC is defined against the posterior spread of the\n",
+        "   control response, so `nec` is its limit, not its expectation: at\n",
+        "   negligible noise it returns 1.2985 against a true 1.3, but at\n",
+        "   realistic noise coverage falls to 0 in the widest cells on EVERY\n",
+        "   arm including A. Read the arm-to-arm CONTRAST only; the shared\n",
+        "   design component cancels there. See SESSION.md.\n")
+  }
   s <- mets[mets$endpoint == en, ]
   print(s[order(s$delta, s$top_factor, s$R, s$arm),
           c("delta", "top_factor", "R", "arm", "n", "rel_bias", "bias_mcse",
@@ -76,6 +126,12 @@ print(byd, digits = 3, row.names = FALSE)
 print(byr, digits = 3, row.names = FALSE)
 cat("If |bias| rises with Delta and is flat in R, the growth-rate-scale",
     "mechanism holds.\nIf it rises with R at fixed Delta, it does not.\n")
+cat("\nNOTE: R is NOT an independent axis here. Under the study's\n",
+    "parameterisation the generating model is exactly scale-equivariant in the\n",
+    "growth rate, so R can only act through signal-to-noise, and only because\n",
+    "the sweep holds the residual scale ABSOLUTE (sigma_mode = 'absolute',\n",
+    "anchored at R = 2.3). Read the R rows as a noise sweep, not as a test of\n",
+    "the control fold-change. See SESSION.md.\n")
 
 cat("\n3. ErCx biased low under B2; NSEC low under B1 and high under B2.\n")
 p3 <- aggregate(rel_bias ~ arm + endpoint, mets, mean)
