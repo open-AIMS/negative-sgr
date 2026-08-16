@@ -1,10 +1,21 @@
 # Resume here
 
-Updated 2026-08-16 11:20. **Safe to power off at any time.** The sweep writes one
-`.rds` per cell atomically when that cell finishes, so a completed cell cannot be
-damaged and an interrupted cell is simply recomputed. Nothing else is running.
+Updated 2026-08-16 11:25. **Safe to power off at any time.** Cells are written
+atomically at completion, so a finished cell cannot be damaged and an
+interrupted one is simply recomputed.
 
-## To restart after power-on
+## Starting a fresh Claude session
+
+Point it at this file and say something like *"read RESUME.md in
+/mnt/c/Rworking/negative-sgr and let's finish this"*. Everything needed is
+below. Two things it will not know unless told:
+
+- The prompt log required by `/mnt/c/Rworking/CLAUDE.md` §10 lives at
+  `../bayesnec/prompts/negative-sgr-study.md` — append, don't start a new file.
+- **Read "Traps" below before running anything.** Each one cost this project
+  real time.
+
+## Restart the sweep (optional — see below)
 
 ```bash
 cd /mnt/c/Rworking/negative-sgr
@@ -12,17 +23,17 @@ DESIGN=rsep N_ITER=240 WORKERS=18 nohup Rscript analysis/phase5_run.R \
   > analysis/phase5_run.log 2>&1 &
 ```
 
-Completed cells are skipped automatically. As of shutdown **10 of 12 cells are
-done**; cells `d4.0_t2.0_R17.0_s8.1` and `d4.0_t2.0_R73.0_s8.1` remain, about
-3.5 h each on 18 workers.
+Completed cells are skipped automatically. **10 of 12 cells are done.**
+Remaining: `d4.0_t2.0_R17.0_s8.1`, `d4.0_t2.0_R73.0_s8.1`, ~3.5 h each on 18
+workers.
 
-**These two cells are optional.** They extend the R axis only, and `R` is now
-known to be a pure signal-to-noise sweep rather than a test of control
-fold-change (the generating model is exactly scale-equivariant in the growth
-rate). Two of the four R points are already in. Every primary finding is
-complete without them. Skip them if the machine is needed for something else.
+**These two cells are optional and no primary finding depends on them.** They
+extend the `R` axis only, and `R` is a pure signal-to-noise sweep rather than a
+test of control fold-change, because the generating model is exactly
+scale-equivariant in the growth rate. Two of the four R points are already in.
+Skip them unless the noise axis is wanted for the paper.
 
-Verify the sweep is genuinely running, rather than trusting a launch message:
+**Verify it is actually running** — do not trust a launch message:
 
 ```bash
 pgrep -fc "phase5_run[.]R"          # expect ~20
@@ -33,146 +44,134 @@ stat -c %y analysis/phase5_run.log  # should be seconds old
 
 | phase | status |
 |---|---|
-| Plan review | **done** — plan at revision 3, `../bayesnec/ignore/negative-sgr-study-plan.md` |
-| 1 branch verification | **done** — six gates pass on `dev`, `analysis/phase1_gates.csv` |
-| 2 diagnostics | **done** — `analysis/dataset_summary.csv`, three figures |
+| Plan | **revision 4**, `../bayesnec/ignore/negative-sgr-study-plan.md` (rev 3 backed up in `../bayesnec/superceded/`) |
+| 1 branch verification | **done** — six gates pass, `analysis/phase1_gates.csv` |
+| 2 diagnostics | **done** — `analysis/dataset_summary.csv` regenerated post-LOD |
 | 3 arms on real data | **done** — rebuilt post-LOD, no errors, boundary flags corrected |
-| 4 `bot` prior sensitivity | **partly done** — contraction table done; the prior *sweep* is **not** run |
-| 5 simulation | **10 of 12 cells done**, 0 worker failures across ~14,400 fits; 2 optional R cells left |
-| 6 vignette | **done, parked** — branch `negsgr-cens-vignette`, not for `dev` yet |
+| 4 `bot` prior sensitivity | **partly done** — contraction table done; the prior *sweep* (default/wider/tighter, 3 fits) **not run** |
+| 5 simulation | **10 of 12 cells**, 0 worker failures across ~14,400 fits |
+| 6 vignette | **done, parked** on `negsgr-cens-vignette` — **not** for `dev` |
 | 6 paper artefacts | **not started** |
 
 125 tests pass (`tests/testthat/`).
 
-## What is running
+## What is left, in order
 
-```
-DESIGN=rsep N_ITER=240 WORKERS=18 Rscript analysis/phase5_run.R
-```
+1. **`analysis/phase5_report.R`** — run it once the sweep is final. It writes
+   `phase5_metrics.csv` plus a clean-fits sensitivity table.
+2. **Phase 4 prior sweep** — 3 fits, never run. Compare `bot` default/wider/
+   tighter on one dataset to confirm the A-vs-B2 gap is not a prior artefact.
+3. **Fold the Phase 5 results into the plan's conclusions** (§Phase 5) and write
+   the paper artefacts.
+4. **Re-check the vignette's quoted numbers** against the rebuilt
+   `analysis/phase3_parameters.csv` and `phase4_bot_contraction.csv` before that
+   branch goes anywhere. `r_salina`'s LOD did not change and seeds are fixed, so
+   they should reproduce — but they were read off the pre-rebuild table.
+5. **`renv.lock` not written.** Safe once nothing is running.
 
-12 cells x 240 iterations x 6 arms = **17,280 fits**, writing one `.rds` per cell
-to `analysis/phase5/` as each finishes. Existing cells are skipped on restart, so
-an interruption resumes rather than restarts. Progress:
+## Findings
 
-```bash
-grep -E "^\[done\]|^\[skip\]" analysis/phase5_run.log
-ls analysis/phase5/ | wc -l          # cells finished, out of 12
-```
+### Phase 5 — the core result
 
-Projection is 12-48 h wall depending on whether the pilot's 270 s/iteration was
-measured per-core or per-4-chains; the pilot ran under contention at 6 workers,
-so treat it as a range until the first cell lands. Summarise with
-`analysis/phase5_report.R`.
+Where the design reaches the negative region (`f_neg` ~15%, `top_factor = 2.0`),
+ErC50 relative bias:
 
-To stop it: `pkill -f "analysis/phase5_run.R"` — note the pattern must not match
-your own shell, which has bitten this project twice.
+| arm | what it does | bias | note |
+|---|---|---|---|
+| A | raw, `bot` free | **-0.6%** | reference; coverage 0.938 |
+| C | left-censor negatives | **-0.1%** | matches A — censoring recovers what flooring loses |
+| D | truncate at crossing | -1.6% | |
+| B1 | floor to 0, `bot` free | -4.8% | |
+| B3 | floor + `bot` = 0 | -6.4% | |
+| B2 | raw + `bot` = 0 | -9.3% | worst; 4-6 divergences/fit |
 
-## The headline finding from this session
+The flooring penalty **grows with `delta`** (B1: -2.5 -> -5.5 -> -6.3 as delta
+goes 2 -> 4 -> 8), which is the mechanism the four real datasets were too few to
+show.
 
-**The control fold-change `R` is not an axis on the growth-rate scale.** With
-`sigma` proportional to `mu_0`, the generating model is exactly equivariant under
-rescaling the growth rate, so every arm returns the same answer at every `R`
-(verified: `y(R=73) = 5.1512 * y(R=2.3)` to 3e-16, identical rows floored,
-identical `f_neg`). The `rsep` R sweep would have produced three copies of one
-cell.
+**The effect is regime-dependent.** Where the design stops at or below the zero
+crossing (`f_neg` <= 4%), every arm carries a shared -3 to -5% bias from weak
+identification of `bot`, the arms are indistinguishable, and B1 can look
+*better* than A. That is not flooring helping — it is arm A carrying a baseline
+bias that flooring happens to offset. Once the design identifies `bot`, A's bias
+vanishes and the flooring bias stands out. Do not quote the narrow cells alone.
 
-This settles Phase 3's failed R-ordering prediction analytically — not
-underpowered at n = 4, structurally impossible — and it is fixed for the sweep by
-`sigma_mode = "absolute"` (counting error lives on the log-density scale, so SGR
-noise does not scale with the growth rate). Anchored at `R = 2.3`, so the nine
-core cells are numerically unchanged. Full argument in `SESSION.md`.
+### Two outputs withdrawn on evidence
 
-Interpret the R axis as a **signal-to-noise axis**: varying `R` at fixed `sigma_0`
-is the same manipulation as varying `sigma_0` at fixed `R`.
+- **The `R` hypothesis is untestable** on the growth-rate scale, not merely
+  unsupported. `top`, `bot` and residual scale are all proportional to
+  `mu_0 = log(R)/t` while `nec`, `beta` and the design do not involve `R`, so
+  every reported endpoint is invariant. Verified to 3e-16. This explains Phase
+  3's failed `R` ordering without appealing to n = 4.
+- **NSEC coverage against the true `nec` is withdrawn.** Right in the limit
+  (1.2985 vs 1.3 at negligible noise) but at realistic noise coverage falls to
+  **0 of 240** in the widest cells on *every* arm including A, bias +120% to
+  +266%. NSEC is defined against the posterior spread of the control response,
+  so `nec` is its limit, not its expectation. Report **arm contrasts only**.
 
-## Decisions taken 2026-08-14
+ErC10/ErC50 are unaffected: `ecx()` matches `true_ecx()` within 0.006 at
+negligible noise (`analysis/phase5_estimand_check.R`).
 
-1. **Both Rhodomonas detection limits are 10** (protocol-confirmed). `r_salina2`
-   was recorded at 100 on the smallest-observed-density reasoning, which bounds
-   the limit rather than identifying it. Its bound moves -1.147 -> **-1.915**.
-   `infer_lod()` is renamed `min_detected_density()` to stop the mistake
-   recurring. **Phase 3 is being rebuilt in full** (`dataset_meta()` feeds every
-   target, so `targets` invalidated all of them; that also keeps the table on one
-   code path). Log: `analysis/phase3_run_lod10.log`.
-2. **Nothing goes to `dev` for now.** The vignette work stays parked on
-   `negsgr-cens-vignette` (worktree `/mnt/c/Rworking/bayesnec-negsgr`), unmerged
-   and un-PRed, to be revisited alongside the `example7` rewrite (#193).
+### Phase 3 — real data
 
-**Check after the rebuild:** the vignette quotes `r_salina` `bot` values
-(-1.985 / -5.64 / -2.45 and contractions 0.996 / 0.379 / 0.953). `r_salina`'s LOD
-is unchanged and the seeds are fixed, so these should reproduce -- but they came
-from the pre-rebuild table and must be re-checked against the new
-`analysis/phase3_parameters.csv` and `phase4_bot_contraction.csv` before that
-branch goes anywhere.
-
-## Results so far (Phase 3, unchanged)
-
-- **The gate passes.** Arm A's estimate falls outside the convention arms'
-  intervals in 14 of 24 dataset x arm x endpoint combinations.
-- **The pre-registered ordering prediction fails** — and the `R` half of it is
-  now known to be untestable by construction. The `Delta` half remains open and
-  is what the sweep is for.
-- **Arm B2 is broken, not merely biased** — divergences on all four datasets,
-  treedepth saturation, `c_proliferum2` ErC50 342 [0.01, 429].
-- **B1/B3 sample cleanly and move the answer materially**, non-overlapping
-  intervals: `c_proliferum` ErC50 3.36 [2.64, 4.41] -> 6.35 [5.77, 7.01].
+- **Gate passes**: arm A's estimate falls outside the convention arms' intervals
+  in **13 of 18** usable combinations.
+- **Arm B2 is unusable on all four datasets** for at least one endpoint.
 - **`bot` contraction is the cleanest supporting result** — flooring pins the
   asymptote (0.966-0.997) where arm A has 0.39-0.42.
-- **Two results flagged unusable** in `analysis/phase3_endpoints.csv` — arm D's
-  ErC50 on `c_proliferum` and `r_salina`, where `ecx()` returns `max(x)`.
+- **`Delta` does not order the four datasets** (Spearman 0.40; `R` gives -0.20),
+  even after the LOD correction moved `r_salina2` from last to second. n = 4 is
+  close to powerless; the simulation settles it.
 - **Arm C leaves `bot` unidentified where the asymptote is entirely censored.**
-  On `r_salina`: substitution gives -1.985 [-2.013, -1.958] with SD 0.014,
-  left-censoring -5.64 [-11.0, -2.51] with SD 2.23 (the prior's tail, chains
-  clean), interval censoring -2.45 [-2.68, -2.10]. This is the vignette.
+  On `r_salina`: substitution gives -1.985 [-2.013, -1.958] SD 0.014;
+  left-censoring -5.64 [-11.0, -2.51] SD 2.23 (the prior's tail, chains clean);
+  interval censoring -2.45 [-2.68, -2.10]. **This is the vignette.**
 
-## Open items, roughly in order
+## Traps
 
-1. **Re-run `analysis/phase3_report.R`** once the rebuild finishes, and diff the
-   tables against the pre-LOD versions — `r_salina2` should move, nothing else
-   should.
-2. **Phase 5 report** once the sweep lands — `analysis/phase5_report.R`.
-3. **Phase 4 prior sweep** — 3 fits, deferred only because the machine is busy.
-4. **`renv.lock` not written** — deferred again, since `renv::init()` writes a
-   `.Rprofile` and a sweep is running. Do it when the machine is idle.
-5. **Protocol confirmation** — both LODs are now confirmed (decision 1).
-   `mu_0`, `t` and `n_0` are still recovered arithmetically rather than read from
-   the protocols; they reproduce the supplied SGR column exactly, so this is a
-   provenance formality rather than an open risk.
-6. **Paper artefacts** — not started.
+Each of these cost real time. Read before running anything.
 
-## Plan file needs revision 4
+1. **`pkill`/`pgrep` patterns match your own shell.** `pkill -f phase5_run.R`
+   kills the invoking bash too (exit 144). Use a bracket class:
+   `pkill -f "phase5_ru[n].R"`. This has bitten the project three times,
+   including killing a monitor.
+2. **`tail -f` does not work on `/mnt/c`** — it is a 9p mount with no inotify
+   and errors with "No data available". Poll instead.
+3. **The `targets` store is on ext4 at `/home/rfisher/negsgr_targets`**, not in
+   the project. `_targets.yaml` points at it. It was moved because 9p failed
+   read-back verification on large objects under load ("Error storing output:
+   file read error"), twice. Do not move it back.
+4. **`bnec()` has no `brm_args` argument.** Everything for `brm()` goes through
+   `...`; a `brm_args = list(...)` silently becomes one unused argument and
+   `chains`/`backend`/`init` revert to defaults with no warning.
+5. **Priors are compiled into the Stan program as literals.** `bnec()`'s
+   gaussian defaults are functions of the response, so a per-dataset prior means
+   a recompile per fit (3-5 min each). The sweep holds the prior fixed within a
+   cell and warms the cache serially. Measured immaterial: switching the prior
+   moves an endpoint by 3-12% of its Monte Carlo spread.
+6. **Do not filter simulation fits on `divergences == 0`.** Arm A averages ~0
+   and B2 averages 4-6, so the filter flatters the worst arm. `phase5_report.R`
+   reports all successful fits with a clean-fits sensitivity table alongside.
+7. **`family = "Beta"`, not `"beta"`** — base R's `beta()` is the beta function
+   and fails with "unused argument (link = 'identity')".
+8. **A detection limit is a protocol fact, not a data fact.** The smallest
+   observed positive density bounds it from above; it does not identify it. That
+   error put `r_salina2`'s LOD at 100 instead of 10. Hence
+   `min_detected_density()`, deliberately not named `infer_lod()`.
+9. **Check artefact timestamps, not exit codes.** A `targets` run reported "42
+   completed" while leaving a stale pre-correction object behind, and a sweep
+   reported `[done]` on a cell where 239 of 240 iterations had failed.
 
-`../bayesnec/ignore/negative-sgr-study-plan.md` is at revision 3 and now carries
-three statements known to be wrong. Revision 3 is backed up at
-`../bayesnec/superceded/negative-sgr-study-plan-rev3.md`. To change:
-
-1. **`r_salina2`'s LOD is 10, not 100** (the revision-3 header states 100). Its
-   `d` lower bound moves from >= 1.147 to >= 1.915, so its `Delta` rises and the
-   pre-registered `Delta` ordering may no longer read
-   `c_proliferum > c_proliferum2 > r_salina > r_salina2`. **Recompute from the
-   rebuilt `analysis/dataset_summary.csv` before rewriting the ordering** --
-   do not hand-edit the number.
-2. **"If divergence instead orders by `R`, the mechanism above is wrong."** That
-   test cannot be run: on the growth-rate scale `R` has no path to any endpoint.
-   The plan's requirement that "the simulation must carry `R` and `Delta` as
-   separate factors" is only satisfiable by making `R` a signal-to-noise axis,
-   which is what `sigma_mode = "absolute"` now does. State this as a result.
-3. **The revision-3 header still says the vignette target is `example6`, not
-   `example1`.** That claim was withdrawn on 2026-08-12 (it was read off
-   `cens-impl`, which predates the commit adding the section to `example1`) but
-   the header was never corrected.
-
-Also worth folding in: arm D is degenerate wherever the design does not reach
-the zero crossing (all `top_factor = 0.8` cells), and the simulation now holds
-the prior fixed within a cell.
-
-## Environment notes
+## Environment
 
 - Pinned to `bayesnec` `dev` @ `374e511c`, loaded from
-  `/mnt/c/Rworking/bayesnec-issue173`, **detached** so it cannot drift.
-  `load_bayesnec()` asserts the SHA.
-- `STUDY_CORES = 18` (was 6; the competing study has finished). 22 cores total.
+  `/mnt/c/Rworking/bayesnec-issue173`, **detached** so it cannot drift;
+  `load_bayesnec()` asserts the SHA and stops if it moved.
+- `STUDY_CORES = 18` of 22.
 - Worktrees: main `/mnt/c/Rworking/bayesnec` on `dev`;
-  `/mnt/c/Rworking/bayesnec-negsgr` on `negsgr-cens-vignette`. `beta-ub-impl` and
-  `issue-191-dispersion` are the other session's — leave alone.
-- `tail -f` does not work on `/mnt/c` (DrvFs, no inotify). Poll instead.
+  `/mnt/c/Rworking/bayesnec-negsgr` on `negsgr-cens-vignette` (parked).
+  `beta-ub-impl` and `issue-191-dispersion` belong to another session —
+  **leave alone**, including the untracked `example7` drafts in
+  `/mnt/c/Rworking/bayesnec-dispersion`.
+- **Nothing goes to `dev`** without the user saying so. That is a standing
+  decision from 2026-08-15, not an oversight.
