@@ -106,6 +106,65 @@ for (en in c("ErC10", "ErC50", "NSEC")) {
         digits = 3, row.names = FALSE)
 }
 
+## ----------------------------------------------------------- the regime -----
+## The arm comparison is REGIME-DEPENDENT and must never be reported as a single
+## pooled number.
+##
+## Where the design stops at or below the zero crossing, almost nothing is
+## negative, `bot` is weakly identified in every arm alike, all six arms carry a
+## shared bias of the same sign, and B1 can even come out ahead of A. That is
+## not flooring helping: it is arm A carrying a baseline bias from an
+## unidentified asymptote that flooring happens to offset. Only once the design
+## identifies `bot` does A's bias vanish and the flooring bias stand alone.
+## Pooling the two regimes averages a real effect against an artefact.
+##
+## Split on `f_neg` -- the fraction of responses the convention actually alters
+## -- rather than on `top_factor`, which is only its design proxy. The threshold
+## sits in an empty gap: cells run 0.003-0.042 below it and 0.148-0.152 above,
+## with nothing in between, so the split is not sensitive to where in that gap
+## the line is drawn.
+F_NEG_REACHING <- 0.10
+mets$regime <- ifelse(mets$f_neg > F_NEG_REACHING, "reaches", "stops short")
+
+## `R` is held out of the headline. Under this parameterisation the generating
+## model is exactly scale-equivariant in the growth rate, so the R cells vary
+## signal-to-noise and nothing else (the sweep holds sigma absolute); averaging
+## them into the arm comparison would silently weight it by noise level.
+head_ln <- mets[mets$R == 2.3, ]
+
+cat("\n===== HEADLINE: ARMS BY REGIME (R = 2.3 cells only) =====\n")
+for (en in c("ErC10", "ErC50")) {
+  cat("\n--", en, "--\n")
+  s <- head_ln[head_ln$endpoint == en, ]
+  tab <- aggregate(cbind(rel_bias, coverage, rmse, f_neg) ~ arm + regime, s,
+                   mean)
+  ## Merged rather than column-bound: `aggregate` on a cbind() formula drops
+  ## rows where any response is NA, so a cell with one missing metric would
+  ## shift the two results out of alignment and silently mislabel n_cells.
+  nc <- aggregate(cell ~ arm + regime, s, function(z) length(unique(z)))
+  names(nc)[names(nc) == "cell"] <- "n_cells"
+  tab <- merge(tab, nc, by = c("arm", "regime"))
+  tab <- tab[order(tab$regime, tab$rel_bias), ]
+  print(tab, digits = 3, row.names = FALSE)
+}
+cat("\nRead the `reaches` block as the study's result and the `stops short`",
+    "block\nas the null case. An arm ordering that only appears in `stops",
+    "short` is a\nstatement about weak identification, not about the",
+    "convention.\n")
+
+## The mechanism claim: within the reaching regime the flooring penalty should
+## grow with `delta`, because `delta` sets how wrong each altered point is.
+## Reported per arm rather than pooled so a flat arm cannot be hidden by a
+## steep one.
+cat("\n===== DOES THE PENALTY GROW WITH delta, WHERE THE DESIGN REACHES? =====\n")
+for (en in c("ErC10", "ErC50")) {
+  cat("\n--", en, "--\n")
+  s <- head_ln[head_ln$endpoint == en & head_ln$regime == "reaches", ]
+  print(reshape(aggregate(rel_bias ~ delta + arm, s, mean),
+                idvar = "arm", timevar = "delta", direction = "wide"),
+        digits = 3, row.names = FALSE)
+}
+
 ## ------------------------------------------------ the pre-registered claims --
 cat("\n===== PRE-REGISTERED PREDICTIONS =====\n")
 
