@@ -1,13 +1,15 @@
 # Resume here
 
-Updated 2026-08-17 08:30. **Safe to power off at any time.** Cells are written
-atomically at completion, so a finished cell cannot be damaged and an
-interrupted one is simply recomputed.
+Updated 2026-08-17 18:40. **Nothing is running.** Safe to power off.
 
-**The sweep is running as of 2026-08-17 08:09** (`analysis/phase5_run_rcells.log`,
-18 workers) on the last two cells, `d4.0_t2.0_R17.0_s8.1` and
-`d4.0_t2.0_R73.0_s8.1`. Expect ~7 h total. Nothing else is waiting on it except
-a re-run of `phase5_report.R` and `renv.lock`.
+**The simulation is complete: 12 of 12 cells, 17,280 fits, 0 worker failures.**
+The last two cells landed 2026-08-17 (287.1 min and 321.5 min); both verified
+against their expected shape, not just their `[done]` line. `phase5_report.R`
+has been re-run over all 12 cells, `renv.lock` is written, and the noise-axis
+read-out is in `analysis/phase5_r_axis.txt`.
+
+**All of Phases 1-5 are finished.** What remains is Phase 6's paper artefacts,
+and one decision flagged under "Open decisions" below.
 
 ## Starting a fresh Claude session
 
@@ -20,7 +22,11 @@ below. Two things it will not know unless told:
 - **Read "Traps" below before running anything.** Each one cost this project
   real time.
 
-## Restart the sweep, if it was interrupted
+## Re-running things (nothing needs re-running as of 2026-08-17)
+
+The sweep is complete. Should a cell ever need rebuilding, delete its `.rds` from
+`analysis/phase5/` and re-issue the command below — completed cells are skipped
+automatically, so it is safe to run at any time.
 
 ```bash
 cd /mnt/c/Rworking/negative-sgr
@@ -28,21 +34,17 @@ DESIGN=rsep N_ITER=240 WORKERS=18 nohup Rscript analysis/phase5_run.R \
   > analysis/phase5_run_rcells.log 2>&1 &
 ```
 
-Completed cells are skipped automatically, so this is safe to re-issue at any
-time. Remaining: `d4.0_t2.0_R17.0_s8.1`, `d4.0_t2.0_R73.0_s8.1`, ~3.5 h each on
-18 workers.
-
-**No primary finding depends on these two cells.** They extend the `R` axis
-only, and `R` is a pure signal-to-noise sweep rather than a test of control
-fold-change, because the generating model is exactly scale-equivariant in the
-growth rate. The headline reads the `R = 2.3` cells alone and is already final.
-
 **Verify it is actually running** — do not trust a launch message:
 
 ```bash
 pgrep -fc "phase5_ru[n].R"                 # expect ~20
 stat -c %y analysis/phase5_run_rcells.log  # should be seconds old
 ```
+
+`analysis/overnight_finish.sh` waits for the sweep to exit and then re-runs the
+report, writes `phase5_r_axis.txt` and `renv.lock`, and verifies every cell's
+shape before it will overwrite `phase5_metrics.csv`. Launch it detached with
+`setsid nohup ./analysis/overnight_finish.sh > /dev/null 2>&1 < /dev/null &`.
 
 ## State
 
@@ -53,24 +55,33 @@ stat -c %y analysis/phase5_run_rcells.log  # should be seconds old
 | 2 diagnostics | **done** — `analysis/dataset_summary.csv` regenerated post-LOD |
 | 3 arms on real data | **done** — rebuilt post-LOD, no errors, boundary flags corrected |
 | 4 `bot` prior sensitivity | **done** — contraction table plus the prior sweep, `analysis/phase4_prior_sweep.{R,csv,log}` |
-| 5 simulation | **10 of 12 cells written; the last two running since 2026-08-17 08:09.** 0 worker failures across ~14,400 fits |
-| 5 report | **done for the 10 cells** — `phase5_metrics.csv`, `phase5_metrics_cleanfits.csv`, `phase5_report.log`. **Re-run when the sweep lands** |
+| 5 simulation | **done — 12 of 12 cells, 17,280 fits, 0 worker failures.** Only non-zero exclusion anywhere: arm C, 5 of 240 iterations in `d4.0_t0.8_R2.3` |
+| 5 report | **done over all 12 cells** — `phase5_metrics.csv`, `phase5_metrics_cleanfits.csv`, `phase5_r_axis.txt`, `phase5_report.log` |
 | 6 vignette | **done, parked** on `negsgr-cens-vignette` — **not** for `dev`. Numbers re-checked 2026-08-17; three corrected, commit `4df470ea` |
 | 6 paper artefacts | **not started** (out of scope for the 2026-08-17 session by agreement) |
+| environment | `renv.lock` written (106 packages, R 4.6.1) plus `analysis/session_info.txt` |
 
 125 tests pass (`tests/testthat/`) — re-run 2026-08-17 via `cd tests && Rscript
 testthat.R`. Running `testthat::test_dir()` from the project root fails: the
 runner sources `../R/*.R` and the tests do not load them themselves.
 
-## What is left, in order
+## What is left
 
-1. **Re-run `analysis/phase5_report.R`** once the two R cells land. The headline
-   is unaffected — it reads the `R = 2.3` cells only — so only the R/noise rows
-   change.
-2. **Read the R rows** and decide whether the noise axis earns a place in the
-   paper. Two of four R points were already in; this run adds R = 17 and 73.
-3. **Paper artefacts** (§Phase 6). Not started.
-4. **`renv.lock` not written.** Safe once nothing is running.
+1. **Paper artefacts** (§Phase 6). The only substantive work remaining. The
+   §Phase 5 "Observed result" section of the plan is written to be the source
+   for them; lead with the noise axis, not the `delta` gradient.
+2. **The vignette branch has not been reviewed by anyone but Claude.** It is
+   parked deliberately and nothing goes to `dev` without your say.
+
+## Open decisions
+
+- **`renv.lock` is a record, not an renv project.** Written with
+  `renv::lockfile_create()` / `lockfile_write()`, so it captures the dependency
+  state without creating `renv/`, a project library, or an `.Rprofile`. Running
+  `renv::init()` properly would change how every future R session in this
+  project behaves and was deliberately left to you.
+- Note `/mnt/c/Rworking/CLAUDE.md` records WSL R as 4.5.2; it is actually 4.6.1,
+  which is what the lockfile pins.
 
 ## Findings
 
@@ -110,23 +121,53 @@ identification of `bot`, the arms are indistinguishable, and B1 can look
 bias that flooring happens to offset. Once the design identifies `bot`, A's bias
 vanishes and the flooring bias stands out. Do not quote the narrow cells alone.
 
-### ErC10 tells a different story — do not claim arm A is uniformly best
+### The noise axis is the strongest result — read `analysis/phase5_r_axis.txt`
 
-In the same reaching regime, **every** arm is biased *high* on ErC10 and arm A
-places fifth of six:
+Because the sweep holds the residual scale absolute, rising `R` is a pure
+**precision** sweep at constant `f_neg` (0.143-0.152). Reading
+`R` = 2.3 -> 3.3 -> 17 -> 73, i.e. falling noise:
 
-| arm | C | D | B1 | B3 | A | B2 |
-|---|---|---|---|---|---|---|
-| ErC10 rel. bias | +15% | +17% | +20% | +24% | +24% | +57% |
+| arm | ErC10 bias | ErC50 bias | ErC50 coverage |
+|---|---|---|---|
+| A | +19.0 -> +12.0 -> +3.4 -> **+1.4%** | -0.3 -> -0.8 -> -0.6 -> **-0.4%** | 0.94 -> 0.93 -> 0.88 -> **0.87** |
+| C | +11.1 -> +7.1 -> +2.4 -> **+1.0%** | -0.6 -> -1.4 -> -1.3 -> **-1.0%** | 0.83 -> 0.83 -> 0.79 -> **0.78** |
+| D | +13.6 -> +8.1 -> +2.5 -> **+1.0%** | -2.0 -> -2.0 -> -1.3 -> **-0.9%** | 0.84 -> 0.83 -> 0.80 -> **0.80** |
+| B1 | +17.9 -> +15.9 -> +13.3 -> **+13.2%** | -5.5 -> -7.0 -> -8.1 -> **-8.2%** | 0.70 -> 0.49 -> 0.03 -> **0.000** |
+| B3 | +22.6 -> +20.8 -> +16.3 -> **+15.0%** | -7.4 -> -8.8 -> -10.0 -> **-10.2%** | 0.59 -> 0.33 -> 0.004 -> **0.000** |
+| B2 | +54.7 -> +52.0 -> +50.0 -> **+49.6%** | -10.0 -> -10.6 -> -11.2 -> **-11.3%** | 0.97 -> 0.99 -> 1.00 -> **1.000** |
 
-ErC10 asks for a 10% decline from `top` to be resolved against the noise, and
-that shared estimation difficulty dominates the arm differences rather than the
-reverse. **The claim that survives on both endpoints is that arm C is best or
-joint-best and arm B2 is worst.** So the recommendation is arm C — left-censor
-the negatives — not arm A. Arm C also remains available when the negative
-values were never recorded, which arm A does not. Its one cost is the
-identification failure in Phase 3 and the vignette: where the asymptote is
-entirely censored, `bot` is the prior's and must be reported as such.
+**A/C/D converge to zero bias; B1/B2/B3 converge to non-zero asymptotes.** A
+quantity that does not vanish as noise vanishes is misspecification, not
+estimation error. This is a stronger argument than the `delta` gradient because
+it needs no comparison across cells — each arm is its own control.
+
+**Coverage under flooring collapses to 0 of 240.** The interval shrinks with
+precision while its centre stays displaced, so a better experiment makes a
+floored analysis *more confident and no less wrong*. That is the paper's
+sentence. B2 fails in mirror image — coverage 1.000 with an 11%-low point
+estimate — so **never report coverage without RMSE**, or the two worst arms
+score as the two best.
+
+### The ErC10 "reversal" was a high-noise artefact — resolved
+
+At `R` = 2.3 alone every arm is biased high on ErC10 and arm A places fifth of
+six (C +15%, D +17%, B1 +20%, B3 +24%, A +24%, B2 +57%). That is a shared
+estimation difficulty swamping the arm effect, not a reordering: ErC10 needs a
+10% decline from `top` resolved against the residual, and once precision is
+adequate the ErC10 ordering *is* the ErC50 ordering, C ~ D ~ A << B1 < B3 << B2.
+**Do not quote the `R` = 2.3 ErC10 row alone.**
+
+### What to recommend
+
+**Arms A and C are close and both sound; the claim is that B1/B2/B3 are not** —
+not that one of A or C wins. At adequate precision they are indistinguishable on
+bias (~1% on both endpoints). On coverage they trade: A is better on ErC50
+(0.87-0.94 vs C's 0.78-0.83) and C is better on ErC10 (0.90-0.95 vs A's
+0.83-0.98). **Neither reaches nominal coverage on ErC50 — say so plainly.** Arm
+C's advantage is practical, not statistical: it still works when the negative
+values were never recorded, which arm A does not. Its cost is the identification
+failure in Phase 3 and the vignette — where the asymptote is entirely censored,
+`bot` is the prior's and must be reported as such.
 
 ### Phase 4 — the A-vs-B2 gap is not a prior artefact
 
@@ -158,7 +199,10 @@ Phase 3 gate (13 of 18) is unaffected, but no single combination is decisive.
   unsupported. `top`, `bot` and residual scale are all proportional to
   `mu_0 = log(R)/t` while `nec`, `beta` and the design do not involve `R`, so
   every reported endpoint is invariant. Verified to 3e-16. This explains Phase
-  3's failed `R` ordering without appealing to n = 4.
+  3's failed `R` ordering without appealing to n = 4. **The `R` cells were still
+  worth running** — because the sweep holds the residual scale absolute they
+  became a precision sweep, which is where the study's strongest result came
+  from. Describe them as a noise axis, never as a fold-change axis.
 - **NSEC coverage against the true `nec` is withdrawn.** Right in the limit
   (1.2985 vs 1.3 at negligible noise) but at realistic noise coverage falls to
   **0 of 240** in the widest cells on *every* arm including A, bias +120% to
