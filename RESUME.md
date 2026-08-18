@@ -58,13 +58,13 @@ below. Two things it will not know unless told:
 | 4 `bot` prior sensitivity | **done** — contraction table plus the prior sweep, `analysis/phase4_prior_sweep.{R,csv,log}` |
 | 5 simulation | **done — 12 of 12 cells, 17,280 fits, 0 worker failures.** Only non-zero exclusion anywhere: arm C, 5 of 240 iterations in `d4.0_t0.8_R2.3` |
 | 5 report | **done over all 12 cells** — `phase5_metrics.csv`, `phase5_metrics_cleanfits.csv`, `phase5_r_axis.txt`, `phase5_report.log` |
-| 6 vignette | `example7.Rmd.orig` extended to all eight approaches and re-knitted on `negsgr-cens-vignette`, **not** for `dev`. The `example1` censoring edits are commit `4df470ea` |
+| 6 vignette | **done** — `example7` extended to all eight approaches and re-knitted, `negsgr-cens-vignette` @ `6320d936`, committed locally and **not pushed**, **not** for `dev`. The `example1` censoring edits are commit `4df470ea` |
 | 6 paper artefacts | **not started** |
 | 7 zero-bounded families | **done 2026-08-18 — 12 of 12 cells, 5,760 fits, 0 failures, 0 NA estimates.** Verified by `analysis/phase7_verify.R`; report regenerated over all eight arms. The F mechanism was tested and is recorded below |
 | 8 iteration top-up | **not started** — 240 to 500, §Phase 8 |
 | environment | `renv.lock` written (106 packages, R 4.6.1) plus `analysis/session_info.txt` |
 
-125 tests pass (`tests/testthat/`) — re-run 2026-08-17 via `cd tests && Rscript
+125 tests pass (`tests/testthat/`) — re-run 2026-08-18 via `cd tests && Rscript
 testthat.R`. Running `testthat::test_dir()` from the project root fails: the
 runner sources `../R/*.R` and the tests do not load them themselves.
 
@@ -385,3 +385,20 @@ Each of these cost real time. Read before running anything.
   `/mnt/c/Rworking/bayesnec-dispersion`.
 - **Nothing goes to `dev`** without the user saying so. That is a standing
   decision from 2026-08-15, not an oversight.
+
+## Where the vignette numbers come from
+
+`analysis/vignette_tables.R` generates every result block the vignette embeds --
+`sim_results`, `precision`, `nsec_precision`, plus the figures quoted in prose --
+in exactly the form `example7.Rmd.orig` expects. It reproduces every pre-Phase-7
+number exactly, which is the check that it is generating the same quantities the
+hand-written blocks held. Two definitions in it are not obvious and are recorded
+in the script: the NSEC `nsec` column is a MEAN across iterations while its
+`ratio_to_A` column is the MEDIAN of the per-iteration PAIRED ratio, and the
+headline tables average over `delta` within a regime at `R` = 2.3 only, because
+`R` is a noise axis and pooling it would weight the arm comparison by noise
+level.
+
+Regenerate with `Rscript analysis/vignette_tables.R > analysis/vignette_tables.txt`
+and paste the blocks; do not edit the numbers in the vignette by hand.
+
