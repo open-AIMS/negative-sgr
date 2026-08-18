@@ -67,11 +67,37 @@ runner sources `../R/*.R` and the tests do not load them themselves.
 
 ## What is left
 
-1. **Paper artefacts** (§Phase 6). The only substantive work remaining. The
-   §Phase 5 "Observed result" section of the plan is written to be the source
-   for them; lead with the noise axis, not the `delta` gradient.
-2. **The vignette branch has not been reviewed by anyone but Claude.** It is
+**Plan revision 6 (2026-08-18) adds Phases 7 and 8.** Read
+`../bayesnec/ignore/negative-sgr-study-plan.md` §Phase 7 and §Phase 8 before
+starting; the summary below is only a pointer.
+
+1. **Phase 7, stage 1 — arms E and F at 240 iterations** (~20-24 h, 5,760 fits).
+   E = floor negatives, divide by max, `Beta(link = "identity")`, `nec3param`.
+   F = floor negatives, no scaling, `Gamma(link = "identity")`, `nec3param`.
+   Both take `bnec()`'s own default priors, held fixed within a cell, and let
+   `check_data()` do the boundary nudge. Write to
+   `analysis/phase5/<cell>__ef.rds` — **additive, never rewrite an existing
+   cell file.**
+2. **Finalise the vignette** once stage 1 lands. At that point all eight arms
+   have 240 iterations everywhere and the comparison is complete and balanced.
+3. **Phase 8, stage 2 — top every arm up to 500 iterations** (~3.5 days,
+   24,960 fits). Iterations 241-500, all eight arms, to
+   `analysis/phase5/<cell>__topup.rds`. Seeds `7e5 + i` keep these distinct from
+   1-240 with no further thought. This buys Monte Carlo precision only and
+   cannot change an ordering, which is why it is last.
+4. **Paper artefacts** (§Phase 6). Lead with the noise axis, not the `delta`
+   gradient.
+5. **Re-run the case studies under model averaging.** Phase 3 fixes `nec4param`
+   for cross-arm comparability, which is right for the simulation (it is the
+   generating model) and not defensible on real data. Deferred, not forgotten.
+6. **The vignette branch has not been reviewed by anyone but Claude.** It is
    parked deliberately and nothing goes to `dev` without your say.
+
+**Reporting changes stage 1 forces:** the six-colour arm palette needs two more
+colours and re-validation, not extension by eye; the two-panel split becomes
+three ("measurement retained", "zero boundary imposed", "zero bounded by the
+family"); and the divergence and exclusion tables must cover E and F, whose
+sampling behaviour is not predictable in advance.
 
 ## Open decisions
 
