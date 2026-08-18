@@ -1,6 +1,26 @@
 # Resume here
 
-Updated 2026-08-18 19:00. **Nothing is running.**
+Updated 2026-08-18 23:05. **Phase 8 stage 2 is RUNNING** -- launched 22:58,
+expect roughly 3.5 days, so about 22 August.
+
+```bash
+pkill -f "[-]-file=analysis/phase8"   # stop it -- see Trap 1, and note the
+                                      # pattern must not appear anywhere else
+                                      # on the command line, filenames included
+# resume, from /mnt/c/Rworking/negative-sgr:
+N_ITER_FROM=241 N_ITER_TO=500 CHUNK=40 WORKERS=18 nohup Rscript \
+  analysis/phase8_run.R > analysis/phase8_run.log 2>&1 &
+```
+
+Safe to interrupt at any instant. Writes are chunked at 40 iterations to
+`analysis/phase5/<cell>__topup_i<from>-<to>.rds`, each written under a temporary
+name and renamed, so a file that exists is complete and a resume skips it by
+filename. An interrupt costs at most one block. Progress:
+`ls analysis/phase5/*__topup*.rds | wc -l` -- **84 blocks** is the full stage
+(12 cells x 6 blocks of 40 plus a final 20).
+
+Nothing in stage 2 can change an ordering or a conclusion; it narrows intervals
+only. The vignette and every reported number stand without it.
 
 **Phase 7 stage 1 is complete: 12 of 12 cells, 5,760 fits, 0 failures, 0 NA
 estimates.** All eight arms now have 240 iterations in every one of the twelve
@@ -61,7 +81,7 @@ below. Two things it will not know unless told:
 | 6 vignette | **done** — `example7` extended to all eight approaches and re-knitted, `negsgr-cens-vignette` @ `6320d936`, committed locally and **not pushed**, **not** for `dev`. The `example1` censoring edits are commit `4df470ea` |
 | 6 paper artefacts | **not started** |
 | 7 zero-bounded families | **done 2026-08-18 — 12 of 12 cells, 5,760 fits, 0 failures, 0 NA estimates.** Verified by `analysis/phase7_verify.R`; report regenerated over all eight arms. The F mechanism was tested and is recorded below |
-| 8 iteration top-up | **not started** — 240 to 500, §Phase 8 |
+| 8 iteration top-up | **running** since 2026-08-18 22:58 — `analysis/phase8_run.R`, iterations 241-500 for all eight arms, 24,960 fits, ~3.5 days |
 | environment | `renv.lock` written (106 packages, R 4.6.1) plus `analysis/session_info.txt` |
 
 125 tests pass (`tests/testthat/`) — re-run 2026-08-18 via `cd tests && Rscript
@@ -70,13 +90,12 @@ runner sources `../R/*.R` and the tests do not load them themselves.
 
 ## What is left
 
-1. **Phase 8, stage 2 — top every arm up to 500 iterations** (~3.5 days,
-   24,960 fits). Iterations 241-500, all eight arms, to
-   `analysis/phase5/<cell>__topup.rds`. Seeds `7e5 + i` keep these distinct from
-   1-240 with no further thought. **This buys Monte Carlo precision only and
-   cannot change an ordering**, which is why it is last and why the vignette did
-   not wait for it. The runner for it has not been written; `phase7_run.R` is the
-   template, since it already writes additively and resumes by block.
+1. **Phase 8, stage 2 is running** (launched 2026-08-18 22:58; ~3.5 days,
+   24,960 fits). `analysis/phase8_run.R`, iterations 241-500, all eight arms.
+   When it finishes: re-run `analysis/phase5_report.R` (or `phase7_verify.R`,
+   which calls it) and regenerate the vignette blocks with
+   `analysis/vignette_tables.R`. Expect the numbers to move in the third
+   decimal; if any ordering changes, something is wrong, not interesting.
 2. **Paper artefacts** (§Phase 6). Lead with the noise axis, not the `delta`
    gradient.
 3. **Re-run the case studies under model averaging.** Phase 3 fixes `nec4param`
@@ -321,10 +340,20 @@ negligible noise (`analysis/phase5_estimand_check.R`).
 
 Each of these cost real time. Read before running anything.
 
-1. **`pkill`/`pgrep` patterns match your own shell.** `pkill -f phase5_run.R`
-   kills the invoking bash too (exit 144). Use a bracket class:
-   `pkill -f "phase5_ru[n].R"`. This has bitten the project three times,
-   including killing a monitor.
+1. **`pkill`/`pgrep` patterns match your own shell -- and the bracket class is
+    not enough.** The usual fix is a bracket class, `pkill -f "phase5_ru[n].R"`,
+    so the pattern cannot match the command that contains it. That fails the
+    moment the SAME command line mentions the target file anywhere else: a
+    `pkill -f "phase8_ru[n].R"` issued alongside a script that contained the
+    literal string `analysis/phase8_run.R` matched its own shell and killed it
+    (exit 144), twice in one session. Either issue the `pkill` on a line that
+    mentions nothing else, or match something only the process has --
+    `pkill -f "[-]-file=analysis/phase8"` matches the R process and not the
+    shell that launched it. The same trap breaks `until ! pgrep -f ...` waiting
+    loops, which then never exit because they always find themselves. The bare
+    form, `pkill -f phase5_run.R`, has killed the invoking bash three times in
+    this project including once killing a monitor; the bracket-class form has
+    now done it twice more by the route above. Five occurrences, one trap.
 2. **`tail -f` does not work on `/mnt/c`** — it is a 9p mount with no inotify
    and errors with "No data available". Poll instead.
 3. **The `targets` store is on ext4 at `/home/rfisher/negsgr_targets`**, not in
