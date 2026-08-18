@@ -7,7 +7,23 @@ source("R/metrics.R")
 files <- list.files("analysis/phase5", pattern = "\\.rds$", full.names = TRUE)
 if (length(files) == 0) stop("No sweep output in analysis/phase5/.")
 res <- do.call(rbind, lapply(files, readRDS))
-res$arm <- factor(res$arm, levels = c("A", "B1", "B2", "B3", "C", "D"))
+## Arm levels and grouping come from the shared palette file rather than being
+## hardcoded here, so that adding the Phase 7 arms (E, F) does not require this
+## script to be edited in two places. Levels are intersected with what is
+## actually on disk, so the report works on a partial sweep: during Phase 7
+## stage 1 only some cells carry E and F, and those arms simply appear with
+## fewer cells rather than breaking the run.
+source("analysis/arm_palette.R")
+present <- intersect(arm_levels, unique(res$arm))
+if (!setequal(present, unique(res$arm))) {
+  stop("arms on disk that the palette does not name: ",
+       paste(setdiff(unique(res$arm), arm_levels), collapse = ", "))
+}
+res$arm <- factor(res$arm, levels = present)
+res$arm_group <- unname(arm_group[as.character(res$arm)])
+cat("arms present:", paste(present, collapse = ", "), "\n")
+cat("cells per arm:\n")
+print(tapply(res$cell, res$arm, function(z) length(unique(z))))
 
 options(width = 200)
 
@@ -169,17 +185,24 @@ for (en in c("ErC10", "ErC50")) {
 cat("\n===== PRE-REGISTERED PREDICTIONS =====\n")
 
 cat("\n1. Bias grows as the series extends past the zero-crossing.\n")
+## "Floors" now means any arm that imposes the zero boundary, by whatever
+## mechanism: by substituting data (B1), by constraining the mean (B2, B3), or
+## by choosing a family whose support excludes negatives (E, F).
+## unique(), not levels(): `mets$arm` is rebuilt as a character column by the
+## cbind() above, so levels() is NULL here and the intersect would be empty.
+FLOORING <- intersect(names(arm_group)[arm_group != "Measurement retained"],
+                      unique(mets$arm))
 p1 <- aggregate(rel_bias ~ top_factor + arm + endpoint,
-                mets[mets$arm %in% c("B1", "B2", "B3"), ], mean)
+                mets[mets$arm %in% FLOORING, ], mean)
 print(reshape(p1, idvar = c("arm", "endpoint"), timevar = "top_factor",
               direction = "wide"), digits = 3, row.names = FALSE)
 
 cat("\n2. Bias orders by Delta, not by R.\n")
 byd <- aggregate(abs(rel_bias) ~ delta,
-                 mets[mets$arm %in% c("B1", "B2", "B3") &
+                 mets[mets$arm %in% FLOORING &
                         mets$endpoint != "NSEC", ], mean)
 byr <- aggregate(abs(rel_bias) ~ R,
-                 mets[mets$arm %in% c("B1", "B2", "B3") &
+                 mets[mets$arm %in% FLOORING &
                         mets$endpoint != "NSEC", ], mean)
 print(byd, digits = 3, row.names = FALSE)
 print(byr, digits = 3, row.names = FALSE)
