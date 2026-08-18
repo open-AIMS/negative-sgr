@@ -1,6 +1,19 @@
 # Resume here
 
-Updated 2026-08-18. **Nothing is running.** Safe to power off.
+Updated 2026-08-18 16:20. **Phase 7 stage 1 was running when this was written.**
+
+```bash
+pkill -f "phase7_ru[n].R"        # stop it -- bracket class, see Trap 1
+# resume, from /mnt/c/Rworking/negative-sgr:
+N_ITER=240 CHUNK=40 WORKERS=18 nohup Rscript analysis/phase7_run.R \
+  > analysis/phase7_run.log 2>&1 &
+```
+
+Safe to interrupt at any instant. Writes are chunked at 40 iterations, each
+written to a temp name and renamed, so a file that exists is complete and a
+resume skips it by filename. An interrupt costs at most one block (~2 min).
+Check progress with `grep -c "^\[done\]" analysis/phase7_run.log` -- 72 blocks
+is the full stage.
 
 **The simulation is complete: 12 of 12 cells, 17,280 fits, 0 worker failures.**
 The last two cells landed 2026-08-17 (287.1 min and 321.5 min); both verified
@@ -61,7 +74,7 @@ shape before it will overwrite `phase5_metrics.csv`. Launch it detached with
 | 5 report | **done over all 12 cells** — `phase5_metrics.csv`, `phase5_metrics_cleanfits.csv`, `phase5_r_axis.txt`, `phase5_report.log` |
 | 6 vignette | `example7.Rmd` written and precompiled on `negsgr-cens-vignette` (`0122ba5f`), **not** for `dev`. Awaiting arms E and F before it is final. The `example1` censoring edits are commit `4df470ea` |
 | 6 paper artefacts | **not started** |
-| 7 zero-bounded families | **not started** — arms E and F, §Phase 7 |
+| 7 zero-bounded families | **stage 1 part-run 2026-08-18** — 8 of 12 cells complete for arms E and F (cells 1-8), 0 failures. Cell 9 was in flight. Remaining: cell 9 (`d8.0_t2.0`) and the precision sweep (`R` = 3.3, 17, 73) |
 | 8 iteration top-up | **not started** — 240 to 500, §Phase 8 |
 | environment | `renv.lock` written (106 packages, R 4.6.1) plus `analysis/session_info.txt` |
 
@@ -114,6 +127,39 @@ sampling behaviour is not predictable in advance.
   which is what the lockfile pins.
 
 ## Findings
+
+### Phase 7 — first results for the family-floored arms (partial, 8 of 12 cells)
+
+**E is the most biased arm in the study, worse than B2.** In the headline cell
+(`d4.0_t2.0_R2.3`, ErC50, truth 5.053): E **-10.3%** with coverage 0.596,
+against B2's -10.0% at 0.967 and arm A's -0.3% at 0.938. Unlike B2 it does not
+even buy width in exchange -- it is biased low by a tenth *and* misses four
+intervals in ten. Choosing a Beta on scaled data is the default thing to do with
+these data and it is the worst-performing approach tested.
+
+**F is strongly `delta`-dependent and changes sign.** ErC50 relative bias:
+**+13.0%** at `delta` 2 (`d2.0_t2.0`), **-5.6%** at `delta` 4. On ErC10 it is
++102.8% and +49.7% in the same two cells, with coverage 0.500 and 0.662 -- among
+the worst in the study on both counts.
+
+**A variance-structure explanation for F was proposed and withdrawn.** The idea
+that a Gamma's mean-squared variance overweights the low tail does not predict a
+sign change with `delta`, which is what the data show. **Do not repeat that
+explanation.** Testing it properly needs a handful of fits with the parameter
+table retained, comparing F's `nec` and `beta` against A's on one simulated
+dataset -- minutes of compute, and it should be done before the vignette makes
+any mechanistic claim about F. Until then the defensible statement is that F is
+badly biased and poorly covered, without saying why.
+
+**Neither new arm gives any sampling warning.** Mean divergences per fit in the
+reaching cells: E 0.00, F 0.07, against B2's 5.58. Both produce the worst ErC10
+estimates in the study while sampling cleanly, which strengthens rather than
+weakens the vignette's existing point that flooring failures are silent.
+
+**`phase5_metrics.csv` has deliberately NOT been regenerated.** It still
+describes the complete six-arm sweep. Regenerating it mid-stage would write a
+file that mixes twelve-cell arms with partial ones and reads as results.
+Regenerate only once cell 12 lands.
 
 ### Phase 5 — the core result
 
