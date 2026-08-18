@@ -1,6 +1,6 @@
 # Resume here
 
-Updated 2026-08-17 18:40. **Nothing is running.** Safe to power off.
+Updated 2026-08-18. **Nothing is running.** Safe to power off.
 
 **The simulation is complete: 12 of 12 cells, 17,280 fits, 0 worker failures.**
 The last two cells landed 2026-08-17 (287.1 min and 321.5 min); both verified
@@ -8,8 +8,10 @@ against their expected shape, not just their `[done]` line. `phase5_report.R`
 has been re-run over all 12 cells, `renv.lock` is written, and the noise-axis
 read-out is in `analysis/phase5_r_axis.txt`.
 
-**All of Phases 1-5 are finished.** What remains is Phase 6's paper artefacts,
-and one decision flagged under "Open decisions" below.
+**Phases 1-5 are finished.** Plan revision 6 (2026-08-18) adds two more:
+Phase 7 brings in the zero-bounded families that floor implicitly (arms E and
+F), and Phase 8 sequences the remaining compute so the vignette is not blocked
+behind it. See "What is left".
 
 ## Starting a fresh Claude session
 
@@ -50,15 +52,17 @@ shape before it will overwrite `phase5_metrics.csv`. Launch it detached with
 
 | phase | status |
 |---|---|
-| Plan | **revision 5**, `../bayesnec/ignore/negative-sgr-study-plan.md` (rev 4 backed up in `../bayesnec/superceded/`). §Phase 4 and §Phase 5 now carry "Observed result" subsections scoring the pre-registered predictions |
+| Plan | **revision 6**, `../bayesnec/ignore/negative-sgr-study-plan.md` (rev 5 backed up in `../bayesnec/superceded/`). §Phase 4 and §Phase 5 carry "Observed result" subsections; §Phase 7 and §Phase 8 are the outstanding work |
 | 1 branch verification | **done** — six gates pass, `analysis/phase1_gates.csv` |
 | 2 diagnostics | **done** — `analysis/dataset_summary.csv` regenerated post-LOD |
 | 3 arms on real data | **done** — rebuilt post-LOD, no errors, boundary flags corrected |
 | 4 `bot` prior sensitivity | **done** — contraction table plus the prior sweep, `analysis/phase4_prior_sweep.{R,csv,log}` |
 | 5 simulation | **done — 12 of 12 cells, 17,280 fits, 0 worker failures.** Only non-zero exclusion anywhere: arm C, 5 of 240 iterations in `d4.0_t0.8_R2.3` |
 | 5 report | **done over all 12 cells** — `phase5_metrics.csv`, `phase5_metrics_cleanfits.csv`, `phase5_r_axis.txt`, `phase5_report.log` |
-| 6 vignette | **done, parked** on `negsgr-cens-vignette` — **not** for `dev`. Numbers re-checked 2026-08-17; three corrected, commit `4df470ea` |
-| 6 paper artefacts | **not started** (out of scope for the 2026-08-17 session by agreement) |
+| 6 vignette | `example7.Rmd` written and precompiled on `negsgr-cens-vignette` (`0122ba5f`), **not** for `dev`. Awaiting arms E and F before it is final. The `example1` censoring edits are commit `4df470ea` |
+| 6 paper artefacts | **not started** |
+| 7 zero-bounded families | **not started** — arms E and F, §Phase 7 |
+| 8 iteration top-up | **not started** — 240 to 500, §Phase 8 |
 | environment | `renv.lock` written (106 packages, R 4.6.1) plus `analysis/session_info.txt` |
 
 125 tests pass (`tests/testthat/`) — re-run 2026-08-17 via `cd tests && Rscript
