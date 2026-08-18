@@ -1,30 +1,40 @@
 # Resume here
 
-Updated 2026-08-18 16:20. **Phase 7 stage 1 was running when this was written.**
+Updated 2026-08-18 19:00. **Nothing is running.**
+
+**Phase 7 stage 1 is complete: 12 of 12 cells, 5,760 fits, 0 failures, 0 NA
+estimates.** All eight arms now have 240 iterations in every one of the twelve
+scenarios. `phase5_metrics.csv`, `phase5_metrics_cleanfits.csv` and
+`phase5_r_axis.txt` have been regenerated over all eight, verified first by
+`analysis/phase7_verify.R` (shape, not `[done]` lines -- Trap 9).
+
+**Phases 1-5 and 7 are finished.** What remains is Phase 6 (the vignette and the
+paper artefacts) and Phase 8 stage 2, the iteration top-up. See "What is left".
+
+## Re-running the simulation (nothing needs re-running as of 2026-08-18)
+
+Both sweeps are complete and both skip finished work, so either command is safe
+to issue at any time. Phase 7 writes per 40-iteration block, Phase 5 per cell.
 
 ```bash
-pkill -f "phase7_ru[n].R"        # stop it -- bracket class, see Trap 1
-# resume, from /mnt/c/Rworking/negative-sgr:
+cd /mnt/c/Rworking/negative-sgr
+# arms E and F (phase 7 stage 1)
 N_ITER=240 CHUNK=40 WORKERS=18 nohup Rscript analysis/phase7_run.R \
-  > analysis/phase7_run.log 2>&1 &
+  >> analysis/phase7_run.log 2>&1 &
+# arms A-D, B1-B3 (phase 5)
+DESIGN=rsep N_ITER=240 WORKERS=18 nohup Rscript analysis/phase5_run.R \
+  > analysis/phase5_run_rcells.log 2>&1 &
 ```
 
-Safe to interrupt at any instant. Writes are chunked at 40 iterations, each
-written to a temp name and renamed, so a file that exists is complete and a
-resume skips it by filename. An interrupt costs at most one block (~2 min).
-Check progress with `grep -c "^\[done\]" analysis/phase7_run.log` -- 72 blocks
-is the full stage.
+**Verify it is actually running** -- do not trust a launch message:
 
-**The simulation is complete: 12 of 12 cells, 17,280 fits, 0 worker failures.**
-The last two cells landed 2026-08-17 (287.1 min and 321.5 min); both verified
-against their expected shape, not just their `[done]` line. `phase5_report.R`
-has been re-run over all 12 cells, `renv.lock` is written, and the noise-axis
-read-out is in `analysis/phase5_r_axis.txt`.
+```bash
+pgrep -fc "phase7_ru[n].R"                 # expect ~20
+ls analysis/phase5/*__ef*.rds | wc -l      # 72 blocks is the full stage 1
+```
 
-**Phases 1-5 are finished.** Plan revision 6 (2026-08-18) adds two more:
-Phase 7 brings in the zero-bounded families that floor implicitly (arms E and
-F), and Phase 8 sequences the remaining compute so the vignette is not blocked
-behind it. See "What is left".
+After any re-run, `Rscript analysis/phase7_verify.R` checks every cell's shape
+and regenerates the report only if all twelve pass.
 
 ## Starting a fresh Claude session
 
@@ -37,44 +47,20 @@ below. Two things it will not know unless told:
 - **Read "Traps" below before running anything.** Each one cost this project
   real time.
 
-## Re-running things (nothing needs re-running as of 2026-08-17)
-
-The sweep is complete. Should a cell ever need rebuilding, delete its `.rds` from
-`analysis/phase5/` and re-issue the command below — completed cells are skipped
-automatically, so it is safe to run at any time.
-
-```bash
-cd /mnt/c/Rworking/negative-sgr
-DESIGN=rsep N_ITER=240 WORKERS=18 nohup Rscript analysis/phase5_run.R \
-  > analysis/phase5_run_rcells.log 2>&1 &
-```
-
-**Verify it is actually running** — do not trust a launch message:
-
-```bash
-pgrep -fc "phase5_ru[n].R"                 # expect ~20
-stat -c %y analysis/phase5_run_rcells.log  # should be seconds old
-```
-
-`analysis/overnight_finish.sh` waits for the sweep to exit and then re-runs the
-report, writes `phase5_r_axis.txt` and `renv.lock`, and verifies every cell's
-shape before it will overwrite `phase5_metrics.csv`. Launch it detached with
-`setsid nohup ./analysis/overnight_finish.sh > /dev/null 2>&1 < /dev/null &`.
-
 ## State
 
 | phase | status |
 |---|---|
-| Plan | **revision 6**, `../bayesnec/ignore/negative-sgr-study-plan.md` (rev 5 backed up in `../bayesnec/superceded/`). §Phase 4 and §Phase 5 carry "Observed result" subsections; §Phase 7 and §Phase 8 are the outstanding work |
+| Plan | **revision 6**, `../bayesnec/ignore/negative-sgr-study-plan.md` (revs 3-6 backed up in `../bayesnec/superceded/`). §Phase 4, §Phase 5 and §Phase 7 carry "Observed result" subsections; §Phase 8 stage 2 is the only outstanding compute |
 | 1 branch verification | **done** — six gates pass, `analysis/phase1_gates.csv` |
 | 2 diagnostics | **done** — `analysis/dataset_summary.csv` regenerated post-LOD |
 | 3 arms on real data | **done** — rebuilt post-LOD, no errors, boundary flags corrected |
 | 4 `bot` prior sensitivity | **done** — contraction table plus the prior sweep, `analysis/phase4_prior_sweep.{R,csv,log}` |
 | 5 simulation | **done — 12 of 12 cells, 17,280 fits, 0 worker failures.** Only non-zero exclusion anywhere: arm C, 5 of 240 iterations in `d4.0_t0.8_R2.3` |
 | 5 report | **done over all 12 cells** — `phase5_metrics.csv`, `phase5_metrics_cleanfits.csv`, `phase5_r_axis.txt`, `phase5_report.log` |
-| 6 vignette | `example7.Rmd` written and precompiled on `negsgr-cens-vignette` (`0122ba5f`), **not** for `dev`. Awaiting arms E and F before it is final. The `example1` censoring edits are commit `4df470ea` |
+| 6 vignette | `example7.Rmd.orig` extended to all eight approaches and re-knitted on `negsgr-cens-vignette`, **not** for `dev`. The `example1` censoring edits are commit `4df470ea` |
 | 6 paper artefacts | **not started** |
-| 7 zero-bounded families | **stage 1 part-run 2026-08-18** — 8 of 12 cells complete for arms E and F (cells 1-8), 0 failures. Cell 9 was in flight. Remaining: cell 9 (`d8.0_t2.0`) and the precision sweep (`R` = 3.3, 17, 73) |
+| 7 zero-bounded families | **done 2026-08-18 — 12 of 12 cells, 5,760 fits, 0 failures, 0 NA estimates.** Verified by `analysis/phase7_verify.R`; report regenerated over all eight arms. The F mechanism was tested and is recorded below |
 | 8 iteration top-up | **not started** — 240 to 500, §Phase 8 |
 | environment | `renv.lock` written (106 packages, R 4.6.1) plus `analysis/session_info.txt` |
 
@@ -84,37 +70,28 @@ runner sources `../R/*.R` and the tests do not load them themselves.
 
 ## What is left
 
-**Plan revision 6 (2026-08-18) adds Phases 7 and 8.** Read
-`../bayesnec/ignore/negative-sgr-study-plan.md` §Phase 7 and §Phase 8 before
-starting; the summary below is only a pointer.
-
-1. **Phase 7, stage 1 — arms E and F at 240 iterations** (~20-24 h, 5,760 fits).
-   E = floor negatives, divide by max, `Beta(link = "identity")`, `nec3param`.
-   F = floor negatives, no scaling, `Gamma(link = "identity")`, `nec3param`.
-   Both take `bnec()`'s own default priors, held fixed within a cell, and let
-   `check_data()` do the boundary nudge. Write to
-   `analysis/phase5/<cell>__ef.rds` — **additive, never rewrite an existing
-   cell file.**
-2. **Finalise the vignette** once stage 1 lands. At that point all eight arms
-   have 240 iterations everywhere and the comparison is complete and balanced.
-3. **Phase 8, stage 2 — top every arm up to 500 iterations** (~3.5 days,
+1. **Phase 8, stage 2 — top every arm up to 500 iterations** (~3.5 days,
    24,960 fits). Iterations 241-500, all eight arms, to
    `analysis/phase5/<cell>__topup.rds`. Seeds `7e5 + i` keep these distinct from
-   1-240 with no further thought. This buys Monte Carlo precision only and
-   cannot change an ordering, which is why it is last.
-4. **Paper artefacts** (§Phase 6). Lead with the noise axis, not the `delta`
+   1-240 with no further thought. **This buys Monte Carlo precision only and
+   cannot change an ordering**, which is why it is last and why the vignette did
+   not wait for it. The runner for it has not been written; `phase7_run.R` is the
+   template, since it already writes additively and resumes by block.
+2. **Paper artefacts** (§Phase 6). Lead with the noise axis, not the `delta`
    gradient.
-5. **Re-run the case studies under model averaging.** Phase 3 fixes `nec4param`
+3. **Re-run the case studies under model averaging.** Phase 3 fixes `nec4param`
    for cross-arm comparability, which is right for the simulation (it is the
    generating model) and not defensible on real data. Deferred, not forgotten.
-6. **The vignette branch has not been reviewed by anyone but Claude.** It is
+4. **The vignette branch has not been reviewed by anyone but Claude.** It is
    parked deliberately and nothing goes to `dev` without your say.
+5. **Why the `nec` displacement under arm F reverses with `delta` is not
+   explained.** The vignette says so explicitly rather than guessing. If it is
+   worth chasing, `analysis/phase7_f_mechanism.R` is the harness to extend.
 
-**Reporting changes stage 1 forces:** the six-colour arm palette needs two more
-colours and re-validation, not extension by eye; the two-panel split becomes
-three ("measurement retained", "zero boundary imposed", "zero bounded by the
-family"); and the divergence and exclusion tables must cover E and F, whose
-sampling behaviour is not predictable in advance.
+**The reporting changes stage 1 forced are all discharged:** the palette is eight
+colours and re-validated (`analysis/arm_palette.R`), the two-panel split is three
+("measurement retained", "zero boundary imposed", "zero bounded by the family"),
+and the exclusion and divergence tables cover E and F.
 
 ## Open decisions
 
@@ -128,38 +105,60 @@ sampling behaviour is not predictable in advance.
 
 ## Findings
 
-### Phase 7 — first results for the family-floored arms (partial, 8 of 12 cells)
+### Phase 7 — the family-floored arms, complete
 
-**E is the most biased arm in the study, worse than B2.** In the headline cell
-(`d4.0_t2.0_R2.3`, ErC50, truth 5.053): E **-10.3%** with coverage 0.596,
-against B2's -10.0% at 0.967 and arm A's -0.3% at 0.938. Unlike B2 it does not
-even buy width in exchange -- it is biased low by a tenth *and* misses four
-intervals in ten. Choosing a Beta on scaled data is the default thing to do with
-these data and it is the worst-performing approach tested.
+**Both arms are worse than every Gaussian convention at high precision, and both
+sample cleanly while being so.** Mean divergent transitions per fit in the
+reaching cells: E 0.00, F 0.03, against B2's 5.67 and D's 1.21. Exclusion rate
+0.000 for both, over 2,880 fits each. This strengthens rather than weakens the
+study's existing point that flooring failures are silent -- the two approaches
+with the worst high-precision bias are also the two best behaved by diagnostics.
 
-**F is strongly `delta`-dependent and changes sign.** ErC50 relative bias:
-**+13.0%** at `delta` 2 (`d2.0_t2.0`), **-5.6%** at `delta` 4. On ErC10 it is
-+102.8% and +49.7% in the same two cells, with coverage 0.500 and 0.662 -- among
-the worst in the study on both counts.
+ErC50 down the noise axis (`R` = 2.3 -> 3.3 -> 17 -> 73, i.e. falling noise):
 
-**A variance-structure explanation for F was proposed and withdrawn.** The idea
-that a Gamma's mean-squared variance overweights the low tail does not predict a
-sign change with `delta`, which is what the data show. **Do not repeat that
-explanation.** Testing it properly needs a handful of fits with the parameter
-table retained, comparing F's `nec` and `beta` against A's on one simulated
-dataset -- minutes of compute, and it should be done before the vignette makes
-any mechanistic claim about F. Until then the defensible statement is that F is
-badly biased and poorly covered, without saying why.
+| arm | ErC50 bias | ErC50 coverage |
+|---|---|---|
+| E | -10.3 -> -13.2 -> -15.0 -> **-14.8%** | 0.60 -> 0.23 -> 0.00 -> **0.000** |
+| F | -5.6 -> -10.5 -> -14.9 -> **-15.6%** | 0.89 -> 0.80 -> 0.36 -> **0.129** |
 
-**Neither new arm gives any sampling warning.** Mean divergences per fit in the
-reaching cells: E 0.00, F 0.07, against B2's 5.58. Both produce the worst ErC10
-estimates in the study while sampling cleanly, which strengthens rather than
-weakens the vignette's existing point that flooring failures are silent.
+At the finest precision these are the two largest ErC50 biases in the study,
+ahead of B2's -11.3%. **E is the more important of the two**: it is the family
+analogue of B3, behaves like it only worse, and choosing a Beta on a scaled
+response is the default thing to do with these data.
 
-**`phase5_metrics.csv` has deliberately NOT been regenerated.** It still
-describes the complete six-arm sweep. Regenerating it mid-stage would write a
-file that mixes twelve-cell arms with partial ones and reads as results.
-Regenerate only once cell 12 lands.
+**F's pooled bias is a trap -- never quote it.** Its reaching-regime ErC50 bias
+averages -2.0%, which reads as respectable, but it is a mean over a quantity that
+changes sign: **+13.0% at `delta` 2, -5.6% at 4, -13.4% at 8**. Its RMSE is 1.07
+against arm A's 0.40, the largest of any arm, and that is what gives it away.
+
+**The variance-structure explanation is now positively contradicted, not merely
+unsupported.** `analysis/phase7_f_mechanism.R` refits F against **B3** -- same
+floored data, same zero asymptote, so the contrast isolates the likelihood and
+nothing else -- on the sweep's own first 20 iterations per reaching cell. It
+reproduces the sweep bit-for-bit (paired difference exactly 0.00), so these are
+the sweep's fits with the parameter table retained. The displacement is carried
+by **`nec`**, not `beta`:
+
+| `delta` | `nec` F-B3 | sign | `beta` F-B3 | ErC50 F-B3 |
+|---|---|---|---|---|
+| 2 | +1.50 (SE 0.33) | 19/20 positive | +0.16 (SE 0.08) | +0.80 (SE 0.13) |
+| 4 | +0.78 (SE 0.43) | 15/20 positive | +0.27 (SE 0.10) | +0.23 (SE 0.30) |
+| 8 | -0.16 (SE 0.10) | 3/20 positive | +0.01 (SE 0.06) | -0.18 (SE 0.05) |
+
+`nec` and ErC50 displacements correlate at 0.56-0.96. The old story -- a Gamma's
+mean-squared variance overweighting the low tail and flattening the descent --
+would live in `beta`, and `beta` is the parameter that does not move. **Do not
+revive it.** The Gamma relocates the breakpoint; it does not bend the curve.
+
+The one mechanism statement the data support is about dispersion. A Gamma with an
+identity link has a constant coefficient of variation, and fitting one to floored
+data forces that CV to **47-64%**, against 10-13% for the Gaussian on the same
+floored data and a true control CV of 9.6%. **Why the displacement reverses with
+`delta` is still not established**, and the vignette says so rather than guessing.
+
+E and F were **not** run on the four real datasets, deliberately: there is no
+true value to score them against there, and what they contribute -- that the bias
+survives to the noise-free limit -- exists only where the truth is known.
 
 ### Phase 5 — the core result
 
@@ -211,8 +210,11 @@ Because the sweep holds the residual scale absolute, rising `R` is a pure
 | B1 | +17.9 -> +15.9 -> +13.3 -> **+13.2%** | -5.5 -> -7.0 -> -8.1 -> **-8.2%** | 0.70 -> 0.49 -> 0.03 -> **0.000** |
 | B3 | +22.6 -> +20.8 -> +16.3 -> **+15.0%** | -7.4 -> -8.8 -> -10.0 -> **-10.2%** | 0.59 -> 0.33 -> 0.004 -> **0.000** |
 | B2 | +54.7 -> +52.0 -> +50.0 -> **+49.6%** | -10.0 -> -10.6 -> -11.2 -> **-11.3%** | 0.97 -> 0.99 -> 1.00 -> **1.000** |
+| E | +11.6 -> +13.0 -> +12.7 -> **+12.5%** | -10.3 -> -13.2 -> -15.0 -> **-14.8%** | 0.60 -> 0.23 -> 0.00 -> **0.000** |
+| F | +49.7 -> +40.6 -> +22.8 -> **+15.8%** | -5.6 -> -10.5 -> -14.9 -> **-15.6%** | 0.89 -> 0.80 -> 0.36 -> **0.129** |
 
-**A/C/D converge to zero bias; B1/B2/B3 converge to non-zero asymptotes.** A
+**A/C/D converge to zero bias; B1/B2/B3 and E/F converge to non-zero
+asymptotes**, and E and F end furthest from the truth on ErC50 of any arm. A
 quantity that does not vanish as noise vanishes is misspecification, not
 estimation error. This is a stronger argument than the `delta` gradient because
 it needs no comparison across cells — each arm is its own control.
@@ -231,11 +233,15 @@ six (C +15%, D +17%, B1 +20%, B3 +24%, A +24%, B2 +57%). That is a shared
 estimation difficulty swamping the arm effect, not a reordering: ErC10 needs a
 10% decline from `top` resolved against the residual, and once precision is
 adequate the ErC10 ordering *is* the ErC50 ordering, C ~ D ~ A << B1 < B3 << B2.
-**Do not quote the `R` = 2.3 ErC10 row alone.**
+**Do not quote the `R` = 2.3 ErC10 row alone.** F is the one arm whose ErC10
+bias falls steeply with precision (+49.7% -> +15.8%) without converging: it
+flattens an order of magnitude away from A's +1.4%, so a reader who sees only
+that it improves will draw the wrong conclusion.
 
 ### What to recommend
 
-**Arms A and C are close and both sound; the claim is that B1/B2/B3 are not** —
+**Arms A and C are close and both sound; the claim is that B1/B2/B3, E and F
+are not** —
 not that one of A or C wins. At adequate precision they are indistinguishable on
 bias (~1% on both endpoints). On coverage they trade: A is better on ErC50
 (0.87-0.94 vs C's 0.78-0.83) and C is better on ErC10 (0.90-0.95 vs A's
@@ -244,6 +250,12 @@ C's advantage is practical, not statistical: it still works when the negative
 values were never recorded, which arm A does not. Its cost is the identification
 failure in Phase 3 and the vignette — where the asymptote is entirely censored,
 `bot` is the prior's and must be reported as such.
+
+**The strongest single recommendation to come out of Phase 7** is the one about
+families, because it is the choice most analysts actually make: moving to a Beta
+or a Gamma to accommodate a response that will not go negative is the worst of
+the eight options tested, and it is the only one whose flooring is invisible in
+the code.
 
 ### Phase 4 — the A-vs-B2 gap is not a prior artefact
 
@@ -347,7 +359,14 @@ Each of these cost real time. Read before running anything.
     Note also that arms B2/B3 have no `bot` column at all — Stan does not
     declare a parameter whose prior is `constant(0)` — so handle length 0
     rather than assuming length 1.
-11. **Run the tests as `cd tests && Rscript testthat.R`.** `testthat.R` sources
+11. **A cell file's row count is not `iterations x arms x 3`.** A *failed* fit
+    writes one row carrying the error message, not three endpoint rows, so
+    `d4.0_t0.8_R2.3_s8.1.rds` holds 4310 rows rather than 4320 -- the five arm-C
+    failures contribute one row each. A verifier that hardcodes 4320 flags that
+    known-good cell as incomplete and refuses to regenerate the report.
+    `analysis/phase7_verify.R` derives the expectation from the recorded
+    failures instead.
+12. **Run the tests as `cd tests && Rscript testthat.R`.** `testthat.R` sources
     `../R/*.R`; the test files do not, so `testthat::test_dir("tests/testthat")`
     from the project root fails with "could not find function `sim_truth`" and
     looks like a broken suite.
