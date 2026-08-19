@@ -1,7 +1,20 @@
 # Resume here
 
-Updated 2026-08-18 23:05. **Phase 8 stage 2 is RUNNING** -- launched 22:58,
-expect roughly 3.5 days, so about 22 August.
+Updated 2026-08-19 10:35. **Phase 8 stage 2 is RUNNING** -- launched 2026-08-18
+22:58, interrupted by a WSL crash at about 10:00 on the 19th and resumed at
+10:29 with 46 of 84 blocks already on disk. The crash cost the one block in
+flight and nothing else: no stray `.tmp` files, every completed block readable,
+41,280 rows and 0 failures across the blocks that survived. Expect completion
+late on 20 August.
+
+**Timing is very uneven and the block count misleads.** The six `stops short`
+cells ran 8-11 min per block; the reaching and precision cells run 40-120. The
+long ones are `fit_arm()`'s escalation path doing its job -- an iteration trips
+R-hat > 1.05 and is refitted with `num_warmup=4000`, `adapt_delta=0.999`,
+`max_depth=15`, four chains sequentially. A worker sitting at 8% CPU for over an
+hour is that, not a hang; check with
+`ps -eo etime,pcpu,cmd | grep "[-]-file=analysis/phase8"` and look at the
+cmdstan arguments of its child.
 
 ```bash
 pkill -f "[-]-file=analysis/phase8"   # stop it -- see Trap 1, and note the
