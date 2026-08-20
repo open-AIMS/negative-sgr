@@ -221,6 +221,63 @@ and the exclusion and divergence tables cover E and F.
 
 ## Findings
 
+### Phase 9 — the case studies under model averaging (2026-08-21)
+
+The question §Phase 3 deferred. All four datasets, eight arms, candidate set
+`decline`, shared arm-A prior extended to one prior per candidate model. 32
+arm-fits, 0 failures. `analysis/phase9_{modelavg,report}.R`.
+
+**The conclusion survives.** Arm A's estimate falls outside the convention arms'
+intervals in **12 of 24** usable combinations, against 13 of 18 under the fixed
+`nec4param`. Averaging itself barely moves the arms -- median |log ratio| 0.006
+(D) to 0.031 (B3), the exception being B2 at 0.169 -- so the Phase 3 numbers
+were not artefacts of assuming one equation.
+
+**The new finding: flooring acts on model SELECTION, not only on the estimate.**
+The shape the intact analysis most supports loses most of its weight under
+flooring, in every dataset:
+
+| dataset | A's best model | in A | B1 | B2 | B3 | C | D |
+|---|---|---|---|---|---|---|---|
+| `c_proliferum` | `neclin` | 0.76 | **0.0006** | 0.00 | 0.00 | 0.45 | 0.43 |
+| `c_proliferum2` | `ecxwb2` | 0.81 | 0.21 | 0.25 | 0.15 | 0.16 | 0.12 |
+| `r_salina` | `nec4param` | 0.51 | 0.18 | 0.11 | 0.14 | 0.31 | 0.35 |
+| `r_salina2` | `nec4param` | 0.83 | 0.28 | 0.00 | 0.28 | 0.89 | 0.16 |
+
+Censoring and truncation keep it. The single-model design could not see this.
+
+**Three caveats that constrain the pinned arms specifically.** B2/B3 cannot use
+`neclin` or `ecxlin` (no asymptote to pin) -- on `c_proliferum` that removes the
+model holding 76% of arm A's weight. They also cannot use bayesnec's
+initial-value search (`constant(0)` has no distribution to draw from, and there
+is no per-model init hook), so they take Stan's inits and are the arms that then
+lose models to the R-hat rule. Both costs land on the same two arms.
+
+**The R-hat rule.** Models with R-hat > 1.01 are dropped and the weights
+re-solved with `amend()`; stacking weights come from an optimisation over the
+set and cannot be renormalised by hand. 12 of 32 arms lost at least one model.
+On `r_salina` C2 the dropped models had held **all** the weight, so the
+unfiltered average rested entirely on chains that had not mixed.
+`phase9_endpoints_nodrop.csv` is the before-version, kept so the size of that
+correction is visible. All 32 fits are in `analysis/phase9_fits/` (1.9 GB,
+gitignored) so the threshold can be changed without refitting.
+
+**Two traps this phase paid for.** `$fit` does not exist on a `bayesmanecfit` --
+`fit_arm()`, `fit_diagnostics()` and `zero_crossing()` all assumed it, failing
+as `Error in array(...)` and `'from' must be a finite number`. And **an
+initialisation change must be validated on the whole candidate set**: bayesnec's
+search costs 612.8 s against 6.1 s for Stan's on floored data, but switching to
+Stan's gave 5 of 8 models with R-hat > 1.01 carrying 85% of the weight on
+`c_proliferum` arm A, against 0 of 6 under the search. Validated on one model,
+it looked like a free hundredfold speedup.
+
+**Open: bayesnec #216 touches these numbers.** Model-averaged `ecx()`/`nsec()`
+resample with an unseeded `sample()`, so repeated calls on the SAME saved fit
+differ -- measured, up to 0.02 on an ErC10 estimate and 0.04 on an interval
+bound, roughly 1%. The gate is a containment test, so a borderline combination
+could flip. A 15-fold re-extraction was running when this was written; finish it
+before quoting "12 of 24" as exact.
+
 ### Phase 7 — the family-floored arms, complete
 
 **Both arms are worse than every Gaussian convention at high precision, and both
