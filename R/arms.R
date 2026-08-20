@@ -70,6 +70,15 @@ arm_prior <- function(x, y, fix_bot = FALSE, model = "nec4param") {
 #' not have. brms reads the prior as a data.frame downstream, so the class
 #' attribute is all that has to survive.
 fix_bot_prior <- function(prior) {
+  ## A model SET arrives as a named list of brmsprior objects, one per model
+  ## (see `?bnec`). Pin `bot` in each of them. Models with no `bot` parameter --
+  ## `neclin` and `ecxlin` are the two in the Gaussian declining set -- pass
+  ## through unchanged, because the subsetting expression matches no rows.
+  ## Whether such a model belongs in a pinned-asymptote arm at all is a question
+  ## for the caller, not for this function; see `bot_bearing_models()`.
+  if (is.list(prior) && !inherits(prior, "brmsprior")) {
+    return(lapply(prior, fix_bot_prior))
+  }
   cls <- class(prior)
   pr <- as.data.frame(prior)
   pr$prior[pr$nlpar == "bot"] <- "constant(0)"
@@ -77,6 +86,28 @@ fix_bot_prior <- function(prior) {
   pr$ub[pr$nlpar == "bot"] <- NA
   class(pr) <- cls
   pr
+}
+
+#' The models in a set that have a lower asymptote to pin
+#'
+#' Arms B2 and B3 constrain the lower asymptote to zero. Two of the eight
+#' declining models bayesnec retains under a Gaussian family -- `neclin` and
+#' `ecxlin` -- have no asymptote at all: they decline linearly without bound, so
+#' there is no parameter the constraint can act on and no sense in which they
+#' obey it. They are therefore dropped from the candidate set of the pinned
+#' arms, which is a consequence of the convention rather than a choice about it.
+#'
+#' The cost has to be reported: dropping them changes the candidate set, so a
+#' pinned arm differs from arm A by its model set as well as by the constraint.
+bot_bearing_models <- function(models) {
+  ## `show_params()` returns a LIST of brmsformula objects, one per model, so
+  ## the formula has to be unwrapped before its parameter names are visible.
+  ## Reading `$pforms` off the outer list silently yields NULL and would drop
+  ## every model, which looks like "no model has a bot" rather than an error.
+  has_bot <- function(m) {
+    "bot" %in% names(bayesnec:::show_params(m)[[1]]$pforms)
+  }
+  Filter(has_bot, models)
 }
 
 #' Initial values, needed only when `bot` is held constant
@@ -123,7 +154,7 @@ fixed_bot_inits <- function(x, y, chains, model = "nec4param", seed = NULL,
 #'   if any Rhat exceeds this. Recorded in the returned `escalated` flag.
 fit_arm <- function(arm, dat, prior, crossing = NULL, mcmc = MCMC,
                     model = "nec4param", meta = dataset_meta(),
-                    rhat_threshold = 1.05) {
+                    rhat_threshold = 1.05, init = NULL) {
   ds <- unique(dat$dataset)
   has_undefined <- any(dat$density == 0)
   fix_bot <- arm %in% c("B2", "B3")
@@ -169,12 +200,22 @@ fit_arm <- function(arm, dat, prior, crossing = NULL, mcmc = MCMC,
   # brms' interval form is cens(indicator, upper): the response column carries
   # the lower bound and the second argument the upper. The one-argument form
   # cannot express an interval, so the two arms use different formulas.
-  form <- if (interval) {
-    bayesnec::bnf(paste0("y | cens(cens, y2) ~ crf(x, \"", model, "\")"))
-  } else if (censored) {
-    bayesnec::bnf(paste0("y | cens(cens) ~ crf(x, \"", model, "\")"))
+  ## `model` may name one model ("nec4param"), a bayesnec model GROUP
+  ## ("decline"), or an explicit set of several. The first two are one string
+  ## and go in quoted; a set has to be written into the formula as a `c(...)`
+  ## call, because pasting a length-n vector into one quoted slot would
+  ## silently produce n formulas and fail downstream.
+  mod_arg <- if (length(model) > 1) {
+    paste0("c(", paste0("\"", model, "\"", collapse = ", "), ")")
   } else {
-    bayesnec::bnf(paste0("y ~ crf(x, \"", model, "\")"))
+    paste0("\"", model, "\"")
+  }
+  form <- if (interval) {
+    bayesnec::bnf(paste0("y | cens(cens, y2) ~ crf(x, ", mod_arg, ")"))
+  } else if (censored) {
+    bayesnec::bnf(paste0("y | cens(cens) ~ crf(x, ", mod_arg, ")"))
+  } else {
+    bayesnec::bnf(paste0("y ~ crf(x, ", mod_arg, ")"))
   }
 
   # bnec() has no `brm_args` argument: everything destined for brm() travels
@@ -187,14 +228,45 @@ fit_arm <- function(arm, dat, prior, crossing = NULL, mcmc = MCMC,
                seed = mcmc$seed, backend = "cmdstanr",
                control = list(adapt_delta = mcmc$adapt_delta,
                               max_treedepth = mcmc$max_treedepth))
+  manec <- is.list(prior) && !inherits(prior, "brmsprior")
+  ## An explicit `init` overrides bayesnec's initial-value search for every arm.
+  ##
+  ## Measured on floored data (`c_proliferum`, B1, `nec4param`, identical priors
+  ## and seed): bayesnec's search takes **612.8 s** against **6.1 s** for Stan's
+  ## own random inits -- a hundredfold difference, and the whole run time, since
+  ## the sampling itself takes about a second. The cause is documented in
+  ## `make_good_inits()`: it rejects any draw whose predicted curve leaves the
+  ## observed response range, and floored data has no negative range, so almost
+  ## every draw is rejected and it grinds to the 10,000-trial fallback.
+  ##
+  ## Checked before adopting rather than assumed: the two agree to within Monte
+  ## Carlo error on the same data and seed -- ErC10 2.7836 both ways, ErC50
+  ## 6.347 against 6.367, NSEC 2.323 against 2.312, zero divergences and R-hat
+  ## 1.005/1.007 either way. Initial values move the sampler's starting point,
+  ## not its target.
+  if (!is.null(init)) args$init <- init
   if (fix_bot) {
     # Pin `bot` in the prior we were GIVEN. Deriving a fresh one here would make
     # the Stan program unique to this dataset and force a recompile -- see
     # `fix_bot_prior()`. Inits may stay data-derived: they are passed as values,
     # not compiled into the program, so they cost nothing in cache terms.
     prior <- fix_bot_prior(prior)
-    args$init <- fixed_bot_inits(adat$x, adat$y, mcmc$chains, model,
-                                 seed = mcmc$seed, prior_free = prior_free)
+    if (!is.null(init)) {
+      # caller has been explicit; leave their choice alone
+    } else if (manec) {
+      # Under a model SET, `bnec()` passes one `init` argument to every model it
+      # fits, and the models do not share a parameter vector -- inits drawn for
+      # `nec4param` are meaningless for `ecxll5`. There is no per-model init
+      # hook. So hand initialisation to Stan instead, which is legitimate here
+      # for the reason `fixed_bot_inits()` exists at all: that helper is only
+      # needed because bayesnec's own init path cannot draw from `constant(0)`,
+      # and Stan's random inits never consult the prior. Inits change the
+      # sampler's path, not its target.
+      args$init <- "random"
+    } else {
+      args$init <- fixed_bot_inits(adat$x, adat$y, mcmc$chains, model,
+                                   seed = mcmc$seed, prior_free = prior_free)
+    }
   }
   if (!identical(arm, "SQ")) args$prior <- prior
 
@@ -217,13 +289,16 @@ fit_arm <- function(arm, dat, prior, crossing = NULL, mcmc = MCMC,
   ## 16000). Only the sampler settings change -- model, data and prior are
   ## untouched -- so the arm stays comparable with the rest. The escalation is
   ## recorded so it can be reported rather than hidden.
+  ## `fit_diagnostics()` knows how to read both a single fit and a model
+  ## average; `brms::rhat(fit$fit)` does not, and on a `bayesmanecfit` fails
+  ## inside `array()` with nothing pointing back to here.
   escalated <- FALSE
-  if (max(brms::rhat(fit$fit), na.rm = TRUE) > rhat_threshold) {
+  if (fit_diagnostics(fit)$max_rhat > rhat_threshold) {
     escalated <- TRUE
     args$iter <- mcmc$iter * 3L
     args$warmup <- mcmc$warmup * 4L
     args$control <- list(adapt_delta = 0.999, max_treedepth = 15L)
-    if (fix_bot) {
+    if (fix_bot && !manec && is.null(init)) {
       args$init <- fixed_bot_inits(adat$x, adat$y, mcmc$chains, model,
                                    seed = mcmc$seed)
     }
@@ -252,7 +327,15 @@ fit_arm <- function(arm, dat, prior, crossing = NULL, mcmc = MCMC,
 #' does not cross zero inside the tested range, in which case arm D is the same
 #' data as arm A and should be reported as such.
 zero_crossing <- function(fit, resolution = 1000) {
-  x_rng <- range(fit$fit$data$x)
+  ## The predictor range has to be read differently from a single fit and a
+  ## model average: a `bayesmanecfit` has no `$fit`, it has one brmsfit per
+  ## candidate model under `$mod_fits`. Reading `$fit$data$x` off one returns
+  ## NULL, and `range(NULL)` is `c(Inf, -Inf)`, so the failure surfaces as
+  ## "'from' must be a finite number" from `seq()` with nothing naming the
+  ## cause. Every model in the set was fitted to the same data, so the first
+  ## one answers for all of them.
+  bf <- if (inherits(fit, "bayesmanecfit")) fit$mod_fits[[1]]$fit else fit$fit
+  x_rng <- range(bf$data$x)
   x_seq <- seq(x_rng[1], x_rng[2], length.out = resolution)
   pred <- stats::fitted(fit, newdata = data.frame(x = x_seq),
                         re_formula = NA, summary = TRUE)

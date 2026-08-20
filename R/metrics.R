@@ -11,6 +11,23 @@
 #' rests on interval coverage cannot discard bad fits silently, so the exclusion
 #' rule is applied downstream from these numbers rather than at fit time.
 fit_diagnostics <- function(fit) {
+  ## A model-averaged fit has no single `$fit`: a `bayesmanecfit` holds one
+  ## brmsfit per candidate model under `$mod_fits`, and reading `$fit` off it
+  ## returns NULL, which surfaces much later as an opaque error inside
+  ## `array()`. Aggregate over the set instead -- worst R-hat, total divergent
+  ## transitions, worst effective-sample ratio -- so that a single bad model in
+  ## an average cannot be hidden by the good ones. Per-model numbers are the
+  ## caller's business; see `manec_model_diagnostics()`.
+  if (inherits(fit, "bayesmanecfit")) {
+    per <- do.call(rbind, lapply(fit$mod_fits, function(m) fit_diagnostics(m)))
+    return(data.frame(
+      divergences = sum(per$divergences),
+      max_treedepth_hit = sum(per$max_treedepth_hit),
+      max_rhat = max(per$max_rhat, na.rm = TRUE),
+      min_neff_ratio = min(per$min_neff_ratio, na.rm = TRUE),
+      stringsAsFactors = FALSE
+    ))
+  }
   bf <- fit$fit
   np <- brms::nuts_params(bf)
   divergent <- sum(np$Value[np$Parameter == "divergent__"])
@@ -25,6 +42,26 @@ fit_diagnostics <- function(fit) {
     min_neff_ratio = min(ess, na.rm = TRUE),
     stringsAsFactors = FALSE
   )
+}
+
+#' Sampler health of every model inside a model-averaged fit
+#'
+#' The aggregate in `fit_diagnostics()` answers "is anything wrong here", which
+#' is what an exclusion rule needs. This answers "where", which is what a reader
+#' needs: a model that sampled badly but carries 1% of the weight is a different
+#' situation from one that carries 60%.
+manec_model_diagnostics <- function(fit, dataset = NA, arm = NA) {
+  if (!inherits(fit, "bayesmanecfit")) {
+    return(cbind(dataset = dataset, arm = arm,
+                 model = if (!is.null(fit$model)) fit$model else NA_character_,
+                 wi = 1, fit_diagnostics(fit)))
+  }
+  ms <- fit$mod_stats
+  do.call(rbind, lapply(names(fit$mod_fits), function(m) {
+    cbind(dataset = dataset, arm = arm, model = m,
+          wi = ms$wi[match(m, rownames(ms))],
+          fit_diagnostics(fit$mod_fits[[m]]))
+  }))
 }
 
 #' The three reported endpoints, with 95% credible intervals
