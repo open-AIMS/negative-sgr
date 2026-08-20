@@ -1,6 +1,17 @@
 # Resume here
 
-Updated 2026-08-20 14:20. **Nothing is running. The simulation is finished.**
+Updated 2026-08-21 06:30. **Nothing is running. The simulation and the
+model-averaged case studies are both finished.**
+
+> **TWO SESSIONS ARE WORKING IN THIS CHECKOUT.** A second agent added
+> `R/model_average.R`, `R/setup_phase10.R`, six `analysis/phase10_*.R` scripts
+> and `tests/testthat/test-model_average.R` on 2026-08-20, edited
+> `tests/testthat.R` to source them, and edited the "What is left" section
+> below. None of that has been touched, run or committed from this session, and
+> Phase 9's outputs are all named `phase9_*`, so nothing collides on disk. The
+> test count going 125 -> 159 is theirs, not a regression. **Phase 9 and their
+> Phase 10 overlap and need reconciling by you.** This is the hazard the
+> worktree memory note warns about: two agents, one working tree.
 
 **Phase 8 stage 2 completed 2026-08-20 14:00: 12 of 12 cells, 24,960 fits, 0
 failures, 0 NA estimates.** Every arm now has 500 iterations in every one of the
@@ -55,6 +66,82 @@ iteration trips R-hat > 1.05 and is refitted with `num_warmup=4000`,
 minutes once. **A worker at 8% CPU for over an hour is that, not a hang**; check
 the cmdstan arguments of its child process before concluding anything is stuck.
 
+## Running Phase 10 (the simulation under model averaging)
+
+**Built 2026-08-20, not yet launched.** Gates 0 and 1 pass. The launch is
+sequenced deliberately; do not skip a step, and do not start before Phase 9 has
+finished and `R/arms.R` / `R/metrics.R` are committed -- Phase 10 depends on
+those working-tree changes and `p10_assert_arms_ready()` will refuse to run
+without them.
+
+```bash
+cd /mnt/c/Rworking/negative-sgr
+Rscript analysis/phase10_gate0_pin.R        # done, PASSED -- the #216 pin
+Rscript analysis/phase10_gate1_models.R     # done, PASSED -- candidate sets
+Rscript analysis/phase10_smoke.R            # 2 models per arm, cheap plumbing check
+PHASE10_PILOT=1 Rscript analysis/phase10_run.R > analysis/phase10_pilot.log 2>&1
+Rscript analysis/phase10_gate2_pilot.R      # verifies the pilot; do not skip
+# then, and only then:
+CELLS=12,8,9 N_ITER_FROM=1 N_ITER_TO=100 CHUNK=20 WORKERS=18 nohup Rscript \
+  analysis/phase10_run.R > analysis/phase10_run.log 2>&1 &
+Rscript analysis/phase10_report.R > analysis/phase10_report.log
+```
+
+**Stopping:** `pkill -f "[-]-file=analysis/phase10"`. Match on `--file=`, never
+on the script name -- see Trap 1, which has cost this project five occurrences.
+
+**Progress:** blocks are files. `ls analysis/phase10/*.rds | wc -l`; 15 is full
+at 3 cells x 100 iterations x CHUNK 20.
+
+**The pin is different from every other phase.** Phase 10 loads bayesnec from
+`/mnt/c/Rworking/bayesnec-negsgr-p10` (branch `study-pin-216`), which is
+`374e511c` plus the two #216 commits and nothing else. `R/setup_phase10.R` holds
+the constants and `load_bayesnec_p10()` asserts the SHA. Phases 1-9 are
+untouched and still load `/mnt/c/Rworking/bayesnec-issue173`. Gate 0 asserts both
+halves of what makes this safe: model-averaged output is now reproducible, and a
+stored single-model fit returns bit-identical endpoints, so the 48,000 existing
+fits stand.
+
+**Phase 9 has the same #216 problem and is NOT protected.** It reports
+model-averaged `ecx()` and `nsec()` on the real datasets from the old pin, so
+those numbers are not reproducible between calls. Worth re-running on the
+Phase 10 pin, or at minimum flagging in whatever it reports.
+
+**All five arms use Stan's random inits** (`P10_INIT = "random"`). Not a
+performance tweak: under a model set `fit_arm()` forces random inits for B3,
+because `bnec()` passes one `init` to every model and they do not share a
+parameter vector — so if the other arms used bayesnec's own search, B3 would
+differ by its initialisation as well as by its constraint. The Phase 9 work also
+measured that search at **612.8 s against 6.1 s** on floored data, and four of
+the five arms fit floored or non-negative responses. Verified equivalent on the
+same data and seed (ErC10 identical, ErC50 6.347 vs 6.367, zero divergences
+either way). Cost: Phase 5/7/8 used the search, so the paired contrast now
+differs in inits too — sampler noise rather than bias, but recorded.
+
+**Non-convergence is handled inside the arm, not by filtering results.** Models
+with R-hat > 1.01 are dropped from the candidate set and the weights re-stacked
+over the survivors (`rhat()` then `amend(drop=)`), because that is the workflow.
+This is NOT Trap 6, which forbids excluding fitted datasets from the summaries
+and still holds. Endpoints are recorded at two stages -- `all_models` and
+`converged` -- and `converged` is primary. `fit_arm()`'s escalation is disabled
+(`P10_RHAT_ESCALATE = Inf`): under a model set it re-samples all twelve models
+when any one exceeds the threshold, which would inflate the budget
+unpredictably and is not what an analyst does about one stuck component.
+
+**Budget.** 46 model fits per iteration (A 8, C 8, B3 6, E 12, F 12 -- confirmed
+by Gate 1, not assumed). 100 iterations x 3 cells is 13,800 fits, about 2.5 days
+at 18 workers, **plus roughly 3 hours per cell of compilation** -- every model
+recompiles when the cell changes because the prior constants are Stan literals
+(Trap 5), and the warm-up is serial on purpose. Re-derive from the pilot's
+measured per-arm timings before committing.
+
+**The pairing is verified, and it is the phase's sharpest instrument.** The
+simulated datasets are bit-identical to those the single-model arms saw: 500/500
+iterations match on `f_neg` in all three cells. So `phase10_report.R` reports the
+per-iteration paired difference `averaged - single`, not two independent biases.
+Note `phase8_run.R` renumbers `k` when it subsets cells and would break this;
+`p10_cells()` carries the original index and a test asserts it does.
+
 ## Starting a fresh Claude session
 
 Point it at this file and say something like *"read RESUME.md in
@@ -80,7 +167,10 @@ below. Two things it will not know unless told:
 | 6 vignette | **done at 500 iterations** — `negsgr-cens-vignette` @ `8dc898ba`, committed locally and **not pushed**, **not** for `dev`. The `example1` censoring edits are commit `4df470ea` |
 | 6 paper artefacts | **not started** |
 | 7 zero-bounded families | **done 2026-08-18 — 12 of 12 cells, 5,760 fits, 0 failures, 0 NA estimates.** Verified by `analysis/phase7_verify.R`; report regenerated over all eight arms. The F mechanism was tested and is recorded below |
+| 9 case studies, model-averaged | **done 2026-08-21** — 32 arm-fits, 0 failures, `analysis/phase9_{modelavg,report}.R`. Answers the question §Phase 3 deferred; see Findings |
 | 8 iteration top-up | **done 2026-08-20** — `analysis/phase8_run.R`, iterations 241-500 for all eight arms, 24,960 fits, 0 failures. Every arm now has 500 iterations everywhere |
+| 9 case studies, averaged | **run 2026-08-20 20:01** — `phase9_endpoints.csv`, `phase9_weights.csv`, `phase9_diagnostics.csv` (plus a `_randominit` variant). `R/arms.R` and `R/metrics.R` still **uncommitted**; commit before anything else touches them |
+| 10 simulation, averaged | **built 2026-08-20, not launched** — runner, gates and report written; Gates 0 and 1 and the smoke test PASS. Runs on its own pin (`bayesnec-negsgr-p10`, `374e511c` + #216). Waiting on Phase 9 finishing and `R/arms.R` / `R/metrics.R` being committed |
 | environment | `renv.lock` written (106 packages, R 4.6.1) plus `analysis/session_info.txt` |
 
 125 tests pass (`tests/testthat/`) — re-run 2026-08-18 via `cd tests && Rscript
@@ -92,9 +182,22 @@ runner sources `../R/*.R` and the tests do not load them themselves.
 1. **Paper artefacts** (§Phase 6) are now the only substantive work left. Lead
    with the noise axis, not the `delta` gradient. Every number they need is in
    `phase5_metrics.csv` and `phase5_r_axis.txt` at 500 iterations.
-2. **Re-run the case studies under model averaging.** Phase 3 fixes `nec4param`
-   for cross-arm comparability, which is right for the simulation (it is the
-   generating model) and not defensible on real data. Deferred, not forgotten.
+2. ~~Re-run the case studies under model averaging (Phase 9).~~ **DONE
+   2026-08-21**, commit `ca1b205`. The `R/arms.R` and `R/metrics.R` changes it
+   needed are committed. Results in the Findings section below.
+2b. **Run the simulation under model averaging** (Phase 10, planned
+   2026-08-20). Does averaging rescue the floored arms' bias and coverage, or is
+   the distortion a property of the convention rather than of fixing one
+   equation? Five arms (A, C, B3, E, F) over a `decline` set, three scenarios
+   (cells 12, 8, 9 — in that order), paired to the existing single-model fits by
+   seed reuse. ~13,800 fits, ~2.5 days plus ~9 h of compilation.
+   **Blocked on bayesnec #216** — model-averaged `ecx()`/`nsec()` resample with
+   an unseeded `sample()` and the noise lands on the interval, which is what
+   coverage measures. Recommended route: cherry-pick `c7718866` and `d4b95783`
+   from `issue-216-deterministic-model-averaging` onto the pin `374e511c`
+   (tested: one conflict hunk each in `R/helpers.R` and `R/expand_classes.R`),
+   which leaves every existing single-model number valid. Full plan in §Phase 10
+   of `../bayesnec/ignore/negative-sgr-study-plan.md`.
 3. **The vignette branch has not been reviewed by anyone but Claude.** It is
    parked deliberately and nothing goes to `dev` without your say.
 4. **Why the `nec` displacement under arm F reverses with `delta` is not
