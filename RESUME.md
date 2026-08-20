@@ -1,73 +1,59 @@
 # Resume here
 
-Updated 2026-08-19 10:35. **Phase 8 stage 2 is RUNNING** -- launched 2026-08-18
-22:58, interrupted by a WSL crash at about 10:00 on the 19th and resumed at
-10:29 with 46 of 84 blocks already on disk. The crash cost the one block in
-flight and nothing else: no stray `.tmp` files, every completed block readable,
-41,280 rows and 0 failures across the blocks that survived. Expect completion
-late on 20 August.
+Updated 2026-08-20 14:20. **Nothing is running. The simulation is finished.**
 
-**Timing is very uneven and the block count misleads.** The six `stops short`
-cells ran 8-11 min per block; the reaching and precision cells run 40-120. The
-long ones are `fit_arm()`'s escalation path doing its job -- an iteration trips
-R-hat > 1.05 and is refitted with `num_warmup=4000`, `adapt_delta=0.999`,
-`max_depth=15`, four chains sequentially. A worker sitting at 8% CPU for over an
-hour is that, not a hang; check with
-`ps -eo etime,pcpu,cmd | grep "[-]-file=analysis/phase8"` and look at the
-cmdstan arguments of its child.
+**Phase 8 stage 2 completed 2026-08-20 14:00: 12 of 12 cells, 24,960 fits, 0
+failures, 0 NA estimates.** Every arm now has 500 iterations in every one of the
+twelve scenarios. Verified by shape before anything was reported: each cell holds
+260 x 8 x 3 = 6,240 top-up rows and the 240-iteration files are untouched. The
+run survived a WSL crash on the 19th and resumed with the loss of one block.
 
-```bash
-pkill -f "[-]-file=analysis/phase8"   # stop it -- see Trap 1, and note the
-                                      # pattern must not appear anywhere else
-                                      # on the command line, filenames included
-# resume, from /mnt/c/Rworking/negative-sgr:
-N_ITER_FROM=241 N_ITER_TO=500 CHUNK=40 WORKERS=18 nohup Rscript \
-  analysis/phase8_run.R > analysis/phase8_run.log 2>&1 &
-```
+**No conclusion moved, which is what stage 2 was for.** Mean change in relative
+bias 0.005 and in coverage 0.011 against the 240-iteration numbers; bias MCSE
+fell from about 0.0046 to 0.0030. The ErC10 ordering is identical. The ErC50
+ordering differs in one place -- D and F trade positions -- on a gap of 0.0008
+against a combined MCSE of 0.0073, i.e. 0.12 MCSE, so they were never
+distinguishable and this is not a reordering in any meaningful sense. **Do not
+report D and F as ranked against each other on ErC50.**
 
-Safe to interrupt at any instant. Writes are chunked at 40 iterations to
-`analysis/phase5/<cell>__topup_i<from>-<to>.rds`, each written under a temporary
-name and renamed, so a file that exists is complete and a resume skips it by
-filename. An interrupt costs at most one block. Progress:
-`ls analysis/phase5/*__topup*.rds | wc -l` -- **84 blocks** is the full stage
-(12 cells x 6 blocks of 40 plus a final 20).
+`phase5_metrics.csv`, `phase5_metrics_cleanfits.csv`, `phase5_r_axis.txt`, the
+vignette's three embedded result blocks and every figure quoted in its prose have
+all been regenerated at 500 and committed.
 
-Nothing in stage 2 can change an ordering or a conclusion; it narrows intervals
-only. The vignette and every reported number stand without it.
+## Re-running the simulation (nothing needs re-running as of 2026-08-20)
 
-**Phase 7 stage 1 is complete: 12 of 12 cells, 5,760 fits, 0 failures, 0 NA
-estimates.** All eight arms now have 240 iterations in every one of the twelve
-scenarios. `phase5_metrics.csv`, `phase5_metrics_cleanfits.csv` and
-`phase5_r_axis.txt` have been regenerated over all eight, verified first by
-`analysis/phase7_verify.R` (shape, not `[done]` lines -- Trap 9).
-
-**Phases 1-5 and 7 are finished.** What remains is Phase 6 (the vignette and the
-paper artefacts) and Phase 8 stage 2, the iteration top-up. See "What is left".
-
-## Re-running the simulation (nothing needs re-running as of 2026-08-18)
-
-Both sweeps are complete and both skip finished work, so either command is safe
-to issue at any time. Phase 7 writes per 40-iteration block, Phase 5 per cell.
+All three sweeps are complete and every one skips finished work, so any of these
+is safe to issue at any time.
 
 ```bash
 cd /mnt/c/Rworking/negative-sgr
-# arms E and F (phase 7 stage 1)
-N_ITER=240 CHUNK=40 WORKERS=18 nohup Rscript analysis/phase7_run.R \
-  >> analysis/phase7_run.log 2>&1 &
-# arms A-D, B1-B3 (phase 5)
+# iterations 1-240, arms A-D and B1-B3
 DESIGN=rsep N_ITER=240 WORKERS=18 nohup Rscript analysis/phase5_run.R \
   > analysis/phase5_run_rcells.log 2>&1 &
+# iterations 1-240, arms E and F
+N_ITER=240 CHUNK=40 WORKERS=18 nohup Rscript analysis/phase7_run.R \
+  >> analysis/phase7_run.log 2>&1 &
+# iterations 241-500, all eight arms
+N_ITER_FROM=241 N_ITER_TO=500 CHUNK=40 WORKERS=18 nohup Rscript \
+  analysis/phase8_run.R >> analysis/phase8_run.log 2>&1 &
 ```
 
-**Verify it is actually running** -- do not trust a launch message:
+Then `Rscript analysis/phase7_verify.R`, which checks every cell's shape and
+regenerates the report only if all twelve pass, and
+`Rscript analysis/vignette_tables.R > analysis/vignette_tables.txt` to rebuild
+the vignette's blocks.
 
-```bash
-pgrep -fc "phase7_ru[n].R"                 # expect ~20
-ls analysis/phase5/*__ef*.rds | wc -l      # 72 blocks is the full stage 1
-```
+**Stopping a run:** `pkill -f "[-]-file=analysis/phase8"`. Match on the
+`--file=` argument, never on the script name -- see Trap 1.
 
-After any re-run, `Rscript analysis/phase7_verify.R` checks every cell's shape
-and regenerates the report only if all twelve pass.
+**Reading progress:** blocks are files. `ls analysis/phase5/*__topup*.rds | wc -l`
+(84 is full), `ls analysis/phase5/*__ef*.rds | wc -l` (72 is full). Timing is
+very uneven: the `stops short` cells run 8-11 min per block and the reaching and
+precision cells 40-120. The long ones are `fit_arm()`'s escalation path -- an
+iteration trips R-hat > 1.05 and is refitted with `num_warmup=4000`,
+`adapt_delta=0.999`, `max_depth=15`, four chains sequentially, which took 119
+minutes once. **A worker at 8% CPU for over an hour is that, not a hang**; check
+the cmdstan arguments of its child process before concluding anything is stuck.
 
 ## Starting a fresh Claude session
 
@@ -91,10 +77,10 @@ below. Two things it will not know unless told:
 | 4 `bot` prior sensitivity | **done** — contraction table plus the prior sweep, `analysis/phase4_prior_sweep.{R,csv,log}` |
 | 5 simulation | **done — 12 of 12 cells, 17,280 fits, 0 worker failures.** Only non-zero exclusion anywhere: arm C, 5 of 240 iterations in `d4.0_t0.8_R2.3` |
 | 5 report | **done over all 12 cells** — `phase5_metrics.csv`, `phase5_metrics_cleanfits.csv`, `phase5_r_axis.txt`, `phase5_report.log` |
-| 6 vignette | **done** — `example7` extended to all eight approaches and re-knitted, `negsgr-cens-vignette` @ `6320d936`, committed locally and **not pushed**, **not** for `dev`. The `example1` censoring edits are commit `4df470ea` |
+| 6 vignette | **done at 500 iterations** — `negsgr-cens-vignette` @ `8dc898ba`, committed locally and **not pushed**, **not** for `dev`. The `example1` censoring edits are commit `4df470ea` |
 | 6 paper artefacts | **not started** |
 | 7 zero-bounded families | **done 2026-08-18 — 12 of 12 cells, 5,760 fits, 0 failures, 0 NA estimates.** Verified by `analysis/phase7_verify.R`; report regenerated over all eight arms. The F mechanism was tested and is recorded below |
-| 8 iteration top-up | **running** since 2026-08-18 22:58 — `analysis/phase8_run.R`, iterations 241-500 for all eight arms, 24,960 fits, ~3.5 days |
+| 8 iteration top-up | **done 2026-08-20** — `analysis/phase8_run.R`, iterations 241-500 for all eight arms, 24,960 fits, 0 failures. Every arm now has 500 iterations everywhere |
 | environment | `renv.lock` written (106 packages, R 4.6.1) plus `analysis/session_info.txt` |
 
 125 tests pass (`tests/testthat/`) — re-run 2026-08-18 via `cd tests && Rscript
@@ -103,20 +89,15 @@ runner sources `../R/*.R` and the tests do not load them themselves.
 
 ## What is left
 
-1. **Phase 8, stage 2 is running** (launched 2026-08-18 22:58; ~3.5 days,
-   24,960 fits). `analysis/phase8_run.R`, iterations 241-500, all eight arms.
-   When it finishes: re-run `analysis/phase5_report.R` (or `phase7_verify.R`,
-   which calls it) and regenerate the vignette blocks with
-   `analysis/vignette_tables.R`. Expect the numbers to move in the third
-   decimal; if any ordering changes, something is wrong, not interesting.
-2. **Paper artefacts** (§Phase 6). Lead with the noise axis, not the `delta`
-   gradient.
-3. **Re-run the case studies under model averaging.** Phase 3 fixes `nec4param`
+1. **Paper artefacts** (§Phase 6) are now the only substantive work left. Lead
+   with the noise axis, not the `delta` gradient. Every number they need is in
+   `phase5_metrics.csv` and `phase5_r_axis.txt` at 500 iterations.
+2. **Re-run the case studies under model averaging.** Phase 3 fixes `nec4param`
    for cross-arm comparability, which is right for the simulation (it is the
    generating model) and not defensible on real data. Deferred, not forgotten.
-4. **The vignette branch has not been reviewed by anyone but Claude.** It is
+3. **The vignette branch has not been reviewed by anyone but Claude.** It is
    parked deliberately and nothing goes to `dev` without your say.
-5. **Why the `nec` displacement under arm F reverses with `delta` is not
+4. **Why the `nec` displacement under arm F reverses with `delta` is not
    explained.** The vignette says so explicitly rather than guessing. If it is
    worth chasing, `analysis/phase7_f_mechanism.R` is the harness to extend.
 
@@ -141,8 +122,9 @@ and the exclusion and divergence tables cover E and F.
 
 **Both arms are worse than every Gaussian convention at high precision, and both
 sample cleanly while being so.** Mean divergent transitions per fit in the
-reaching cells: E 0.00, F 0.03, against B2's 5.67 and D's 1.21. Exclusion rate
-0.000 for both, over 2,880 fits each. This strengthens rather than weakens the
+reaching cells: E 0.00, F 0.01, against B2's 5.81 and D's 1.04. Exclusion rate
+0.000 for both. Over the whole 500-iteration sweep E produced **not one divergent
+transition in any of its 6,000 fits**. This strengthens rather than weakens the
 study's existing point that flooring failures are silent -- the two approaches
 with the worst high-precision bias are also the two best behaved by diagnostics.
 
@@ -150,8 +132,8 @@ ErC50 down the noise axis (`R` = 2.3 -> 3.3 -> 17 -> 73, i.e. falling noise):
 
 | arm | ErC50 bias | ErC50 coverage |
 |---|---|---|
-| E | -10.3 -> -13.2 -> -15.0 -> **-14.8%** | 0.60 -> 0.23 -> 0.00 -> **0.000** |
-| F | -5.6 -> -10.5 -> -14.9 -> **-15.6%** | 0.89 -> 0.80 -> 0.36 -> **0.129** |
+| E | -10.6 -> -13.2 -> -15.0 -> **-14.8%** | 0.58 -> 0.24 -> 0.00 -> **0.000** |
+| F | -5.6 -> -10.6 -> -14.7 -> **-15.6%** | 0.89 -> 0.80 -> 0.37 -> **0.116** |
 
 At the finest precision these are the two largest ErC50 biases in the study,
 ahead of B2's -11.3%. **E is the more important of the two**: it is the family
@@ -159,9 +141,9 @@ analogue of B3, behaves like it only worse, and choosing a Beta on a scaled
 response is the default thing to do with these data.
 
 **F's pooled bias is a trap -- never quote it.** Its reaching-regime ErC50 bias
-averages -2.0%, which reads as respectable, but it is a mean over a quantity that
-changes sign: **+13.0% at `delta` 2, -5.6% at 4, -13.4% at 8**. Its RMSE is 1.07
-against arm A's 0.40, the largest of any arm, and that is what gives it away.
+averages -1.6%, which reads as respectable, but it is a mean over a quantity that
+changes sign: **+14.0% at `delta` 2, -5.6% at 4, -13.4% at 8**. Its RMSE is 1.11
+against arm A's 0.38, the largest of any arm, and that is what gives it away.
 
 **The variance-structure explanation is now positively contradicted, not merely
 unsupported.** `analysis/phase7_f_mechanism.R` refits F against **B3** -- same
@@ -199,16 +181,23 @@ REGIME), so these numbers come straight out of its log rather than being
 recomputed by hand.
 
 **ErC50** where the design reaches the negative region — mean over the three
-`R = 2.3, top_factor = 2.0` cells (`f_neg` 0.151):
+`R = 2.3, top_factor = 2.0` cells (`f_neg` 0.152), all eight arms at 500
+iterations:
 
-| arm | what it does | bias | coverage | note |
-|---|---|---|---|---|
-| C | left-censor negatives | **-0.1%** | 0.829 | matches A — censoring recovers what flooring loses |
-| A | raw, `bot` free | **+0.7%** | 0.915 | reference; the only arm near nominal coverage |
-| D | truncate at crossing | -1.6% | 0.853 | |
-| B1 | floor to 0, `bot` free | -4.8% | 0.703 | |
-| B3 | floor + `bot` = 0 | -6.4% | 0.608 | worst coverage |
-| B2 | raw + `bot` = 0 | -9.3% | 0.967 | worst bias; 4-6 divergences/fit. Its coverage is bought with width — RMSE 0.35 against A's 0.13 |
+| arm | what it does | bias | coverage | RMSE | note |
+|---|---|---|---|---|---|
+| C | left-censor negatives | **-0.3%** | 0.845 | 0.46 | matches A — censoring recovers what flooring loses |
+| A | raw, `bot` free | **+0.6%** | 0.929 | 0.38 | reference; the only arm near nominal coverage |
+| F | floor + Gamma, `nec3param` | -1.6% | 0.770 | **1.11** | **do not read as accurate** — a mean over +14.0/-5.6/-13.4 across `delta`, and the largest RMSE of any arm |
+| D | truncate at crossing | -1.7% | 0.850 | 0.48 | |
+| B1 | floor to 0, `bot` free | -4.9% | 0.705 | 0.52 | |
+| B3 | floor + `bot` = 0 | -6.5% | 0.617 | 0.53 | worst coverage of the Gaussian arms |
+| E | scale + Beta, `nec3param` | -8.7% | 0.641 | 0.59 | the default thing to do with these data |
+| B2 | raw + `bot` = 0 | -9.5% | 0.970 | 0.63 | worst bias; ~5.8 divergences/fit. Its coverage is bought with width |
+
+**D and F are not ranked against each other here.** Their gap is 0.0008 against a
+combined MCSE of 0.0073 — 0.12 MCSE. They swapped places between the 240- and
+500-iteration runs, which is what two indistinguishable numbers do.
 
 **[2026-08-17] Arm A's entry was previously recorded as -0.6%. Recomputed from
 `phase5_metrics.csv` it is +0.7%; every other entry reproduces exactly. The
@@ -236,14 +225,14 @@ Because the sweep holds the residual scale absolute, rising `R` is a pure
 
 | arm | ErC10 bias | ErC50 bias | ErC50 coverage |
 |---|---|---|---|
-| A | +19.0 -> +12.0 -> +3.4 -> **+1.4%** | -0.3 -> -0.8 -> -0.6 -> **-0.4%** | 0.94 -> 0.93 -> 0.88 -> **0.87** |
-| C | +11.1 -> +7.1 -> +2.4 -> **+1.0%** | -0.6 -> -1.4 -> -1.3 -> **-1.0%** | 0.83 -> 0.83 -> 0.79 -> **0.78** |
-| D | +13.6 -> +8.1 -> +2.5 -> **+1.0%** | -2.0 -> -2.0 -> -1.3 -> **-0.9%** | 0.84 -> 0.83 -> 0.80 -> **0.80** |
-| B1 | +17.9 -> +15.9 -> +13.3 -> **+13.2%** | -5.5 -> -7.0 -> -8.1 -> **-8.2%** | 0.70 -> 0.49 -> 0.03 -> **0.000** |
-| B3 | +22.6 -> +20.8 -> +16.3 -> **+15.0%** | -7.4 -> -8.8 -> -10.0 -> **-10.2%** | 0.59 -> 0.33 -> 0.004 -> **0.000** |
-| B2 | +54.7 -> +52.0 -> +50.0 -> **+49.6%** | -10.0 -> -10.6 -> -11.2 -> **-11.3%** | 0.97 -> 0.99 -> 1.00 -> **1.000** |
-| E | +11.6 -> +13.0 -> +12.7 -> **+12.5%** | -10.3 -> -13.2 -> -15.0 -> **-14.8%** | 0.60 -> 0.23 -> 0.00 -> **0.000** |
-| F | +49.7 -> +40.6 -> +22.8 -> **+15.8%** | -5.6 -> -10.5 -> -14.9 -> **-15.6%** | 0.89 -> 0.80 -> 0.36 -> **0.129** |
+| A | +19.1 -> +12.1 -> +3.5 -> **+1.5%** | -0.4 -> -0.9 -> -0.6 -> **-0.4%** | 0.95 -> 0.94 -> 0.90 -> **0.89** |
+| C | +10.4 -> +6.7 -> +2.3 -> **+1.0%** | -0.7 -> -1.4 -> -1.3 -> **-1.0%** | 0.85 -> 0.82 -> 0.79 -> **0.77** |
+| D | +12.6 -> +7.6 -> +2.4 -> **+1.0%** | -2.1 -> -2.0 -> -1.3 -> **-1.0%** | 0.84 -> 0.82 -> 0.79 -> **0.79** |
+| B1 | +16.8 -> +15.0 -> +13.1 -> **+13.1%** | -5.6 -> -7.0 -> -8.1 -> **-8.2%** | 0.71 -> 0.51 -> 0.02 -> **0.002** |
+| B3 | +21.4 -> +19.9 -> +15.7 -> **+14.9%** | -7.6 -> -8.9 -> -10.1 -> **-10.2%** | 0.60 -> 0.34 -> 0.004 -> **0.000** |
+| B2 | +54.0 -> +51.5 -> +49.8 -> **+49.5%** | -10.2 -> -10.8 -> -11.3 -> **-11.4%** | 0.97 -> 0.99 -> 1.00 -> **1.000** |
+| E | +10.7 -> +12.5 -> +12.6 -> **+12.4%** | -10.6 -> -13.2 -> -15.0 -> **-14.8%** | 0.58 -> 0.24 -> 0.00 -> **0.000** |
+| F | +49.3 -> +39.5 -> +23.8 -> **+15.7%** | -5.6 -> -10.6 -> -14.7 -> **-15.6%** | 0.89 -> 0.80 -> 0.37 -> **0.116** |
 
 **A/C/D converge to zero bias; B1/B2/B3 and E/F converge to non-zero
 asymptotes**, and E and F end furthest from the truth on ErC50 of any arm. A
@@ -251,7 +240,7 @@ quantity that does not vanish as noise vanishes is misspecification, not
 estimation error. This is a stronger argument than the `delta` gradient because
 it needs no comparison across cells — each arm is its own control.
 
-**Coverage under flooring collapses to 0 of 240.** The interval shrinks with
+**Coverage under flooring collapses to 0 of 500.** The interval shrinks with
 precision while its centre stays displaced, so a better experiment makes a
 floored analysis *more confident and no less wrong*. That is the paper's
 sentence. B2 fails in mirror image — coverage 1.000 with an 11%-low point
