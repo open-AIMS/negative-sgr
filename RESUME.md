@@ -118,6 +118,16 @@ same data and seed (ErC10 identical, ErC50 6.347 vs 6.367, zero divergences
 either way). Cost: Phase 5/7/8 used the search, so the paired contrast now
 differs in inits too — sampler noise rather than bias, but recorded.
 
+**Exclusions are the one place the R-hat rule can reproduce Trap 6, and it is
+handled in three layers.** A PARTIAL drop leaves the arm with an estimate, so
+every dataset is scored and nothing is selected. A TOTAL drop leaves the arm
+with nothing for that dataset, and unequal rates across arms would give each arm
+a differently selected subset. So: the `all_models` stage never screens; the
+headline metrics use COMMON SUPPORT (only iterations where every arm returned an
+estimate); and the per-arm exclusion rate is printed in the same table as
+coverage, with the across-arm spread flagged above 2 points. `phase10_metrics.csv`
+carries both `common` and `available` support rows so the cost is visible.
+
 **Non-convergence is handled inside the arm, not by filtering results.** Models
 with R-hat > 1.01 are dropped from the candidate set and the weights re-stacked
 over the survivors (`rhat()` then `amend(drop=)`), because that is the workflow.
@@ -128,12 +138,41 @@ and still holds. Endpoints are recorded at two stages -- `all_models` and
 when any one exceeds the threshold, which would inflate the budget
 unpredictably and is not what an analyst does about one stuck component.
 
+**Budget: measure it from BLOCK WALL-CLOCK, not from the `elapsed` column.**
+`elapsed` is recorded around the `p10_fit()` call only, so it excludes the
+endpoint/curve computation that follows -- three `ecx()`/`nsec()` evaluations on
+a model average at resolution 1000 across 8-12 models, plus the weights, the
+R-hat drop with its `amend()` re-stack and the curve grid, all run TWICE, once
+per stage. On the pilot `elapsed` summed to 8.9 min/iteration while the block
+took 31.5: fitting is 28% of the work. And pilot timings do not extrapolate --
+median fit time per arm-iteration was ~1.8 min at WORKERS=2 and **4.01 min at
+WORKERS=16**, because 16 concurrent workers contend for memory bandwidth.
+Measured rate in the real run: **107.8 and 108.3 min per 20-iteration block at
+WORKERS=16**, i.e. ~5.4 min/iteration, ~25 h for 300 iterations.
+
+Note `CHUNK=20` with `WORKERS=16` wastes the tail of each block: 20 items over
+16 workers is two waves with 12 idle slots in the second. A chunk that is a
+multiple of the worker count would be ~35% faster. Not changed mid-run, because
+blocks are skipped by FILENAME and a different chunk size would re-run
+already-completed iterations under new names and double-count them in the
+report. Use `CHUNK=16` for any top-up, where the iteration range is fresh.
+
 **Budget.** 46 model fits per iteration (A 8, C 8, B3 6, E 12, F 12 -- confirmed
 by Gate 1, not assumed). 100 iterations x 3 cells is 13,800 fits, about 2.5 days
 at 18 workers, **plus roughly 3 hours per cell of compilation** -- every model
 recompiles when the cell changes because the prior constants are Stan literals
 (Trap 5), and the warm-up is serial on purpose. Re-derive from the pilot's
 measured per-arm timings before committing.
+
+**TRAP: the sweep's Gaussian arms for iterations 1-240 are in the UNSUFFIXED
+file.** `analysis/phase5/<cell>.rds` holds arms A-D and B1-B3 for iterations
+1-240; only E/F (`__ef_`) and the 241-500 top-up (`__topup_`) carry a `__tag`.
+A `list.files()` pattern of `^<cell>__` therefore drops arms A, C and B3 for the
+first 240 iterations **without erroring** -- the merge just returns fewer rows
+and the comparison quietly becomes E-versus-F. This bit the Phase 10 report and
+Gate 2's pairing check. Both now go through `sweep_files()` in
+`R/model_average.R`, which matches `<cell>.rds` and `<cell>__*.rds` and escapes
+the dots in the cell name.
 
 **The pairing is verified, and it is the phase's sharpest instrument.** The
 simulated datasets are bit-identical to those the single-model arms saw: 500/500
@@ -170,7 +209,7 @@ below. Two things it will not know unless told:
 | 9 case studies, model-averaged | **done 2026-08-21** — 32 arm-fits, 0 failures, `analysis/phase9_{modelavg,report}.R`. Answers the question §Phase 3 deferred; see Findings |
 | 8 iteration top-up | **done 2026-08-20** — `analysis/phase8_run.R`, iterations 241-500 for all eight arms, 24,960 fits, 0 failures. Every arm now has 500 iterations everywhere |
 | 9 case studies, averaged | **run 2026-08-20 20:01** — `phase9_endpoints.csv`, `phase9_weights.csv`, `phase9_diagnostics.csv` (plus a `_randominit` variant). `R/arms.R` and `R/metrics.R` still **uncommitted**; commit before anything else touches them |
-| 10 simulation, averaged | **built 2026-08-20, not launched** — runner, gates and report written; Gates 0 and 1 and the smoke test PASS. Runs on its own pin (`bayesnec-negsgr-p10`, `374e511c` + #216). Waiting on Phase 9 finishing and `R/arms.R` / `R/metrics.R` being committed |
+| 10 simulation, averaged | **RUNNING since 2026-08-21 09:22** — cells 12, 8, 9 at 100 iterations, WORKERS=16, `analysis/phase10/`. Gates 0/1/2 and the smoke all passed. ~5.4 min/iteration, ~25 h total. Original state: **built 2026-08-20** — runner, gates and report written; Gates 0 and 1 and the smoke test PASS. Runs on its own pin (`bayesnec-negsgr-p10`, `374e511c` + #216). Waiting on Phase 9 finishing and `R/arms.R` / `R/metrics.R` being committed |
 | environment | `renv.lock` written (106 packages, R 4.6.1) plus `analysis/session_info.txt` |
 
 125 tests pass (`tests/testthat/`) — re-run 2026-08-18 via `cd tests && Rscript
@@ -228,8 +267,8 @@ The question §Phase 3 deferred. All four datasets, eight arms, candidate set
 arm-fits, 0 failures. `analysis/phase9_{modelavg,report}.R`.
 
 **The conclusion survives.** Arm A's estimate falls outside the convention arms'
-intervals in **12 of 24** usable combinations, against 13 of 18 under the fixed
-`nec4param`. Averaging itself barely moves the arms -- median |log ratio| 0.006
+intervals in **12-13 of 24** usable combinations (see the #216 note below for
+why it is a range), against 13 of 18 under the fixed `nec4param`. Averaging itself barely moves the arms -- median |log ratio| 0.006
 (D) to 0.031 (B3), the exception being B2 at 0.169 -- so the Phase 3 numbers
 were not artefacts of assuming one equation.
 
@@ -271,12 +310,22 @@ Stan's gave 5 of 8 models with R-hat > 1.01 carrying 85% of the weight on
 `c_proliferum` arm A, against 0 of 6 under the search. Validated on one model,
 it looked like a free hundredfold speedup.
 
-**Open: bayesnec #216 touches these numbers.** Model-averaged `ecx()`/`nsec()`
-resample with an unseeded `sample()`, so repeated calls on the SAME saved fit
-differ -- measured, up to 0.02 on an ErC10 estimate and 0.04 on an interval
-bound, roughly 1%. The gate is a containment test, so a borderline combination
-could flip. A 15-fold re-extraction was running when this was written; finish it
-before quoting "12 of 24" as exact.
+**bayesnec #216 touches these numbers, and the size of it is now measured.**
+Model-averaged `ecx()`/`nsec()` on the Phase 1-9 pin resample with an unseeded
+`sample()`, so repeated calls on the SAME saved fit differ. Re-extracting all
+sixteen gate-relevant fits 15 times:
+
+- relative SD of a point estimate: median 0.04%, worst 1.03%
+- **the gate reads 12 or 13 of 24, never anything else** -- 12 on seven of the
+  fifteen draws, 13 on eight
+
+So **quote "12-13 of 24", not "12 of 24"**: one combination sits close enough to
+its interval edge to flip with the draw. Nothing else moves, and the comparison
+with Phase 3's 13 of 18 is unaffected. For an exact count, re-extract on the
+patched build the other session prepared (`bayesnec-negsgr-p10`, `ef3954cf`),
+which makes the averaged path deterministic -- the 32 fits are saved, so this
+costs an extraction rather than a refit IF the patch works on objects fitted
+under the old pin, which is untested.
 
 ### Phase 7 — the family-floored arms, complete
 
