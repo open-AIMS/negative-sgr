@@ -1,0 +1,6 @@
+"id","description","passed","detail"
+"P10-G0-1","model-averaged ecx() identical over 6 calls",TRUE,"spread 0/0/0"
+"P10-G0-2","model-averaged nsec() identical over 6 calls",TRUE,"spread 0/0/0"
+"P10-G0-3","model-averaged posterior_epred() identical over 4 calls",TRUE,"values 2.1481759"
+"P10-G0-4","ecx() leaves the caller's RNG stream untouched",TRUE,"before 0.9861143141 after 0.9861143141"
+"P10-G0-5","single-model ecx()/nsec() bit-identical across the two pins",TRUE,"old: 262.33603603603603460|  0.10000000000000001|394.454954954954 | new: 262.33603603603603460|  0.10000000000000001|394.454954954954"

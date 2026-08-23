@@ -1,0 +1,6 @@
+"arm","family","n","n_expected","matches_plan","unexpected","missing","models"
+"A","gaussian",8,8,TRUE,"","","nec4param neclin ecxlin ecx4param ecxwb1 ecxwb2 ecxll5 ecxll4"
+"C","gaussian",8,8,TRUE,"","","nec4param neclin ecxlin ecx4param ecxwb1 ecxwb2 ecxll5 ecxll4"
+"B3","gaussian",6,6,TRUE,"","","nec4param ecx4param ecxwb1 ecxwb2 ecxll5 ecxll4"
+"E","beta",12,12,TRUE,"","","nec3param nec4param ecxexp ecxsigm ecx4param ecxwb1 ecxwb2 ecxwb1p3 ecxwb2p3 ecxll5 ecxll4 ecxll3"
+"F","Gamma",12,12,TRUE,"","","nec3param nec4param ecxexp ecxsigm ecx4param ecxwb1 ecxwb2 ecxwb1p3 ecxwb2p3 ecxll5 ecxll4 ecxll3"

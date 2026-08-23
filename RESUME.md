@@ -208,8 +208,7 @@ below. Two things it will not know unless told:
 | 7 zero-bounded families | **done 2026-08-18 — 12 of 12 cells, 5,760 fits, 0 failures, 0 NA estimates.** Verified by `analysis/phase7_verify.R`; report regenerated over all eight arms. The F mechanism was tested and is recorded below |
 | 9 case studies, model-averaged | **done 2026-08-21** — 32 arm-fits, 0 failures, `analysis/phase9_{modelavg,report}.R`. Answers the question §Phase 3 deferred; see Findings |
 | 8 iteration top-up | **done 2026-08-20** — `analysis/phase8_run.R`, iterations 241-500 for all eight arms, 24,960 fits, 0 failures. Every arm now has 500 iterations everywhere |
-| 9 case studies, averaged | **run 2026-08-20 20:01** — `phase9_endpoints.csv`, `phase9_weights.csv`, `phase9_diagnostics.csv` (plus a `_randominit` variant). `R/arms.R` and `R/metrics.R` still **uncommitted**; commit before anything else touches them |
-| 10 simulation, averaged | **RUNNING since 2026-08-21 09:22** — cells 12, 8, 9 at 100 iterations, WORKERS=16, `analysis/phase10/`. Gates 0/1/2 and the smoke all passed. ~5.4 min/iteration, ~25 h total. Original state: **built 2026-08-20** — runner, gates and report written; Gates 0 and 1 and the smoke test PASS. Runs on its own pin (`bayesnec-negsgr-p10`, `374e511c` + #216). Waiting on Phase 9 finishing and `R/arms.R` / `R/metrics.R` being committed |
+| 10 simulation, averaged | **done 2026-08-23** — 3 cells (12, 8, 9) x 200 iterations x 5 arms, 27,600 fits, 18,000 rows, no gaps, 0 failures, **0 exclusions**. Own pin: `bayesnec-negsgr-p10` @ `study-pin-216` (`374e511c` + #216); Gates 0/1/2 and the smoke all passed. Results in the plan's §Phase 10 Observed result and in `example7`; every vignette number regenerates from `analysis/phase10_vignette_numbers.R` |
 | environment | `renv.lock` written (106 packages, R 4.6.1) plus `analysis/session_info.txt` |
 
 125 tests pass (`tests/testthat/`) — re-run 2026-08-18 via `cd tests && Rscript
@@ -218,6 +217,14 @@ runner sources `../R/*.R` and the tests do not load them themselves.
 
 ## What is left
 
+0. **Nothing is pushed, and two things are not under version control at all.**
+   Phase 10 is committed here and the vignette on `negsgr-cens-vignette`, but
+   this repo has **no remote** and that branch is unpushed, so everything exists
+   on one disk. Also outside git: the **raw Phase 10 block store**
+   (`analysis/phase10/*.rds`, 36 files, 7.8 MB, ignored by the `*.rds` rule that
+   also hides `analysis/phase5/`) — 51 hours of compute — and the **plan
+   document**, which lives in `../bayesnec/ignore/`, a gitignored directory.
+   Decide where both should live.
 1. **Paper artefacts** (§Phase 6) are now the only substantive work left. Lead
    with the noise axis, not the `delta` gradient. Every number they need is in
    `phase5_metrics.csv` and `phase5_r_axis.txt` at 500 iterations.

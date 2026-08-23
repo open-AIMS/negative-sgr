@@ -1,0 +1,8 @@
+"id","description","passed","detail"
+"P10-G2-1","simulated datasets identical to those the single-model arms saw",TRUE,"1500/1500 match on f_neg; 2 cells with a discriminating f_neg"
+"P10-G2-2","all five arms returned all three endpoints on a bayesmanecfit",TRUE,""
+"P10-G2-3","arm C: cens() aterm with a model set averaged over >1 model",TRUE,"models fitted: 7,8"
+"P10-G2-4","arm B3: constant(0) prior in a named list averaged over >1 model",TRUE,"models fitted: 6"
+"P10-G2-5","arm B3's averaged curve respects the zero lower asymptote",TRUE,"min fitted mu = 0.0002231"
+"P10-G2-6","both stages recorded (all_models and converged)",TRUE,"stages: all_models, converged"
+"P10-G2-7","no arm-iteration lost every model to the rhat cutoff",TRUE,"none"
