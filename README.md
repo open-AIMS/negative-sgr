@@ -165,8 +165,20 @@ one approach moves from a bias of +53% to −63% with coverage of 0.01. This is 
 same distinction the precision axis draws throughout — averaging removes the
 component of the error that is estimation and exposes the component that is
 misspecification. Notably, the equation that generated the data is almost never
-selected in the constrained approaches, carrying a thousandth of the stacking
+selected in the constrained approaches, carrying a thousandth of the model
 weight, and the effect concentration is recovered regardless.
+
+Model weights are pseudo-BMA with Bayesian bootstrap, which is the software's
+default and not a choice made for this study. The distinction matters for
+reading the previous paragraph. Stacking solves for the mixture with the best
+predictive performance, and will drive a weight to zero because a model is
+*redundant* given the others as readily as because it is *wrong*; a near-zero
+stacking weight is therefore weak evidence about any single model. Pseudo-BMA
+weights are proportional to expected log predictive density, with the bootstrap
+accounting for its uncertainty, so they behave like relative evidence for each
+model on its own terms. That the generating equation retains a thousandth of the
+weight under a floored dataset is accordingly a statement that it fits far
+worse, not merely that something else covers it.
 
 ## Repository organisation
 

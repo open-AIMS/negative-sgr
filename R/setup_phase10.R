@@ -83,7 +83,7 @@ P10_MODEL_SET <- "decline"
 ##
 ## Order is the run order and it is load-bearing: cell 12 is where the
 ## single-model failure is most extreme AND where averaging has its best chance,
-## because precise data resolve the stacking weights sharply. If averaging
+## because precise data resolve the model weights sharply. If averaging
 ## cannot rescue cell 12 the hypothesis is dead and 8 and 9 are confirmation.
 P10_CELL_ORDER <- c(12L, 8L, 9L)
 

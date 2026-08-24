@@ -1,0 +1,831 @@
+<title>The Zero-Growth Floor</title>
+<style>
+:root{
+  --paper:#F6F7F5; --card:#FDFDFC; --ink:#16211E; --ink-2:#39463F;
+  --muted:#5B6764; --rule:#DCE2DE; --rule-soft:#E8EDEA;
+  --accent:#0E7C61; --accent-soft:#E4EFEA;
+  --warn:#8A5A08;
+  --s-a:#0E7C61; --s-c:#C25E12; --s-d:#8E44C9;
+  --s-b1:#1B6BC4; --s-b3:#B0217A; --s-b2:#7C7A00;
+  --grid:#E3E8E5;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0F1513; --card:#161D1A; --ink:#E3E9E5; --ink-2:#C3CDC8;
+    --muted:#93A09C; --rule:#26302C; --rule-soft:#1D2623;
+    --accent:#2E9C81; --accent-soft:#16261F;
+    --warn:#C99A3A;
+    --s-a:#2E9C81; --s-c:#D0762F; --s-d:#A277D6;
+    --s-b1:#4B92DB; --s-b3:#D44E92; --s-b2:#97941F;
+    --grid:#242E2A;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0F1513; --card:#161D1A; --ink:#E3E9E5; --ink-2:#C3CDC8;
+  --muted:#93A09C; --rule:#26302C; --rule-soft:#1D2623;
+  --accent:#2E9C81; --accent-soft:#16261F;
+  --warn:#C99A3A;
+  --s-a:#2E9C81; --s-c:#D0762F; --s-d:#A277D6;
+  --s-b1:#4B92DB; --s-b3:#D44E92; --s-b2:#97941F;
+  --grid:#242E2A;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:ui-serif,"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  font-size:18px; line-height:1.65; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px; margin:0 auto; padding:0 28px 96px}
+/* Each block is its own grid on the same template, so a full-bleed figure
+   nested inside a section can still span the page. A single grid on .wrap
+   would clamp those figures to the text column. */
+header.mast, section, footer{
+  display:grid; grid-template-columns:1fr min(66ch,100%) 1fr;
+  align-content:start;
+}
+header.mast > *, section > *, footer > *{grid-column:2}
+.bleed{grid-column:1/-1}
+
+h1,h2,h3{text-wrap:balance; line-height:1.18; margin:0}
+h1{font-size:clamp(2.3rem,5.5vw,3.4rem); font-weight:600; letter-spacing:-.018em}
+h2{font-size:1.62rem; font-weight:600; letter-spacing:-.01em}
+h3{font-size:1.12rem; font-weight:600}
+p{margin:0}
+a{color:var(--accent)}
+
+.eyebrow{
+  font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:.7rem; font-weight:600; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--muted);
+}
+.mono{font-family:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,monospace;
+  font-size:.86em; font-variant-numeric:tabular-nums}
+
+/* masthead */
+header.mast{padding:72px 0 0; gap:20px 0}
+.standfirst{font-size:1.24rem; color:var(--ink-2); max-width:56ch}
+.meta{display:flex; flex-wrap:wrap; gap:8px 26px; padding-top:6px;
+  border-top:1px solid var(--rule); margin-top:6px;
+  font-family:ui-sans-serif,system-ui,sans-serif; font-size:.8rem; color:var(--muted)}
+.meta b{color:var(--ink); font-weight:600}
+
+/* the zero-line section divider: the study is about a boundary,
+   so sections are marked by a rule with a tick sitting on it */
+section{padding-top:56px; gap:18px 0}
+section > .rule{height:1px; background:var(--rule);
+  position:relative; margin-bottom:14px}
+section > .rule::before{content:""; position:absolute; left:0; top:-5px;
+  width:2px; height:11px; background:var(--accent)}
+
+.lede{font-size:1.08rem; color:var(--ink-2)}
+.callout{
+  background:var(--card); border:1px solid var(--rule);
+  border-left:2px solid var(--accent);
+  padding:20px 24px; display:flex; flex-direction:column; gap:10px;
+}
+.callout.warn{border-left-color:var(--warn)}
+.callout p{font-size:1rem}
+
+table{border-collapse:collapse; width:100%; font-size:.92rem;
+  font-variant-numeric:tabular-nums}
+.tscroll{overflow-x:auto; -webkit-overflow-scrolling:touch}
+th,td{text-align:left; padding:9px 14px 9px 0; border-bottom:1px solid var(--rule-soft);
+  vertical-align:top}
+thead th{font-family:ui-sans-serif,system-ui,sans-serif; font-size:.7rem;
+  font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+  border-bottom:1px solid var(--rule); white-space:nowrap}
+td.num,th.num{text-align:right; padding-right:22px;
+  font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; font-size:.85rem}
+tr.sep td{border-top:1px solid var(--rule)}
+.swatch{display:inline-block; width:9px; height:9px; border-radius:50%;
+  margin-right:8px; vertical-align:baseline}
+.code{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  font-size:.8rem; color:var(--muted)}
+
+figure{margin:0; display:flex; flex-direction:column; gap:14px}
+figcaption{font-size:.92rem; color:var(--muted); max-width:72ch}
+figcaption b{color:var(--ink); font-weight:600}
+.figframe{background:var(--card); border:1px solid var(--rule); padding:22px 18px 14px}
+svg{display:block; width:100%; height:auto}
+.legend{display:flex; flex-wrap:wrap; gap:8px 20px;
+  font-family:ui-sans-serif,system-ui,sans-serif; font-size:.78rem; color:var(--ink-2)}
+.legend span{display:inline-flex; align-items:center; gap:7px}
+.legend i{width:14px; height:2px; display:inline-block}
+.legend i.dash{background:none;
+  border-top:2px dashed currentColor; height:0}
+
+ul{margin:0; padding-left:1.1em; display:flex; flex-direction:column; gap:9px}
+li{padding-left:.2em}
+li::marker{color:var(--accent)}
+
+.files dt{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.82rem;
+  color:var(--ink); margin-top:12px}
+.files dd{margin:2px 0 0; font-size:.93rem; color:var(--muted)}
+.files dl{margin:0}
+
+footer{margin-top:72px; padding-top:20px; gap:18px 0}
+footer > p{border-top:1px solid var(--rule); padding-top:20px;
+  font-family:ui-sans-serif,system-ui,sans-serif; font-size:.8rem; color:var(--muted)}
+
+@media (max-width:640px){
+  body{font-size:17px}
+  .wrap{padding:0 20px 72px}
+  header.mast{padding-top:48px}
+}
+@media (prefers-reduced-motion:no-preference){
+  a{transition:opacity .15s ease}
+}
+a:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent); outline-offset:3px}
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <div class="eyebrow">Microalgal toxicity testing &middot; method study</div>
+  <h1>The Zero-Growth Floor</h1>
+  <p class="standfirst">In an algal toxicity test, a high enough dose makes the
+  population shrink and the growth rate goes negative. Common practice is to set
+  those values to zero. This is what that does to the numbers you report &mdash; and
+  why a better experiment makes it worse, not better.</p>
+  <div class="meta">
+    <span><b>4</b> real datasets</span>
+    <span><b>17,280</b> simulated model fits</span>
+    <span><b>6</b> analysis methods compared</span>
+    <span><b>0</b> worker failures</span>
+    <span>18 August 2026</span>
+  </div>
+</header>
+
+<section>
+  <div class="rule"></div>
+  <div class="eyebrow">The problem</div>
+  <h2>Growth rate is a rate, and rates can be negative</h2>
+  <p>An algal growth test measures how fast a population multiplies. You count
+  cells at the start and again at the end, and the specific growth rate is the
+  log ratio divided by the test duration. In the controls the population grows,
+  so the rate is positive. At high toxicant concentrations the population can
+  <em>shrink</em> &mdash; more cells die than divide &mdash; and the rate comes out
+  negative. That is not an error or an artefact. It is the correct measurement of
+  a population in decline.</p>
+
+  <p>But a negative growth rate is awkward. It looks wrong on a plot, it breaks
+  a percent-of-control calculation, and several standard models cannot produce
+  one. So laboratories routinely remove it: they replace the negative values with
+  zero, or they constrain the fitted curve so its lower plateau cannot go below
+  zero, or both. The question this study asks is simple &mdash;
+  <strong>does that change the answer you report?</strong></p>
+
+  <p>The answer matters because the reported answer is a regulatory number. The
+  ErC50 is the concentration that halves the growth rate; the ErC10 is the
+  concentration that reduces it by a tenth. These feed into environmental quality
+  guidelines. If a data-handling convention shifts them, it shifts the
+  concentration a regulator considers safe.</p>
+</section>
+
+<section>
+  <div class="rule"></div>
+  <div class="eyebrow">The six methods</div>
+  <h2>What people actually do with the negative values</h2>
+  <p>Six approaches were compared. Three leave the measurement intact; three
+  impose the zero boundary in one way or another. Throughout the analysis files
+  they are referred to by the short codes in the first column.</p>
+
+  <div class="tscroll">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:5.5rem">Code</th>
+        <th>What it does</th>
+        <th>The claim it makes about the data</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="swatch" style="background:var(--s-a)"></span><b class="mono">A</b></td>
+        <td>Analyse the growth rates as measured; let the model estimate how far
+            the curve falls.</td>
+        <td>The negative values are real measurements and are used as such.</td>
+      </tr>
+      <tr>
+        <td><span class="swatch" style="background:var(--s-c)"></span><b class="mono">C</b></td>
+        <td>Declare each negative value as <em>censored</em> at zero &mdash; tell the
+            model "this observation is at or below zero" without asserting a value.</td>
+        <td>Truthful but deliberately less informative: keeps the direction,
+            discards the magnitude.</td>
+      </tr>
+      <tr>
+        <td><span class="swatch" style="background:var(--s-d)"></span><b class="mono">D</b></td>
+        <td>Cut the concentration series off where the fitted curve crosses zero
+            and analyse only what remains.</td>
+        <td>Nothing false, but the high-dose data are thrown away.</td>
+      </tr>
+      <tr class="sep">
+        <td><span class="swatch" style="background:var(--s-b1)"></span><b class="mono">B1</b></td>
+        <td>Replace every negative growth rate with zero. Model unchanged.</td>
+        <td><b>False.</b> Asserts the population held steady when it was dying.</td>
+      </tr>
+      <tr>
+        <td><span class="swatch" style="background:var(--s-b2)"></span><b class="mono">B2</b></td>
+        <td>Keep the data as measured, but force the curve's lower plateau to sit
+            exactly at zero.</td>
+        <td><b>False.</b> Asserts no dose can ever reduce growth below zero.</td>
+      </tr>
+      <tr>
+        <td><span class="swatch" style="background:var(--s-b3)"></span><b class="mono">B3</b></td>
+        <td>Both of the above &mdash; floor the data <em>and</em> pin the plateau.</td>
+        <td><b>False,</b> twice over. This is the most common combination in practice.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout">
+    <p><b>A note on method C.</b> Censoring is the technique used elsewhere for
+    values below a detection limit. Saying "this is at most zero" is a true
+    statement that stops the model being dragged upward by a fabricated value. It
+    is the method available to you when the negative values were never recorded
+    in the first place &mdash; which is often the case with historical data.</p>
+  </div>
+</section>
+
+<section>
+  <div class="rule"></div>
+  <div class="eyebrow">How it was tested</div>
+  <h2>Four real tests, and a simulation where the truth is known</h2>
+  <p>The four real datasets are growth tests on two microalgal species &mdash;
+  two on <em>Cladocopium proliferum</em> (7&nbsp;days) and two on
+  <em>Rhodomonas salina</em> (3&nbsp;days). Between 14% and 30% of their
+  observations sit at or below zero growth. Real data show whether the methods
+  disagree, but they cannot show which one is <em>right</em>, because nobody
+  knows the true ErC50 of a real toxicant.</p>
+
+  <p>So the core evidence is a simulation. Curves with a known true ErC10 and
+  ErC50 were generated, realistic measurement noise added, and each simulated
+  dataset analysed by all six methods. Because the truth is known, each method
+  can be scored on two things that matter:</p>
+
+  <ul>
+    <li><b>Bias</b> &mdash; does the method systematically over- or under-estimate
+    the true value?</li>
+    <li><b>Coverage</b> &mdash; of the 95% credible intervals it produces, what
+    fraction actually contain the truth? A well-behaved method gives 95%.</li>
+  </ul>
+
+  <p>Twelve scenarios, 240 simulated datasets each, six methods:
+  <span class="mono">17,280</span> model fits, with no worker failures and one
+  scenario losing 5 of 240 iterations for a single method. The simulation
+  deliberately generates data with noise that grows toward the bottom of the curve
+  and fits a model that assumes constant noise, because that is the realistic
+  situation rather than a flattering one.</p>
+</section>
+
+<section>
+  <div class="rule"></div>
+  <div class="eyebrow">Finding 1</div>
+  <h2>Flooring pulls the ErC50 down by 5 to 9 per cent</h2>
+  <p>Where the test design actually reaches into negative growth &mdash; about 15%
+  of observations below zero, which is typical of the real datasets &mdash; the six
+  methods separate cleanly.</p>
+
+  <div class="tscroll">
+  <table>
+    <thead>
+      <tr>
+        <th>Method</th>
+        <th class="num">ErC50 bias</th>
+        <th class="num">Coverage</th>
+        <th>Reading</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="swatch" style="background:var(--s-c)"></span>C &mdash; censor</td>
+          <td class="num">&minus;0.1%</td><td class="num">0.83</td>
+          <td>Essentially unbiased</td></tr>
+      <tr><td><span class="swatch" style="background:var(--s-a)"></span>A &mdash; as measured</td>
+          <td class="num">+0.7%</td><td class="num">0.92</td>
+          <td>Essentially unbiased; best coverage</td></tr>
+      <tr><td><span class="swatch" style="background:var(--s-d)"></span>D &mdash; truncate</td>
+          <td class="num">&minus;1.6%</td><td class="num">0.85</td>
+          <td>Acceptable, but discards data</td></tr>
+      <tr class="sep"><td><span class="swatch" style="background:var(--s-b1)"></span>B1 &mdash; floor data</td>
+          <td class="num">&minus;4.8%</td><td class="num">0.70</td>
+          <td>Biased low; intervals miss 3 times in 10</td></tr>
+      <tr><td><span class="swatch" style="background:var(--s-b3)"></span>B3 &mdash; floor + pin</td>
+          <td class="num">&minus;6.4%</td><td class="num">0.61</td>
+          <td>Worse; intervals miss 4 times in 10</td></tr>
+      <tr><td><span class="swatch" style="background:var(--s-b2)"></span>B2 &mdash; pin plateau</td>
+          <td class="num">&minus;9.3%</td><td class="num">0.97</td>
+          <td>Worst bias. High coverage is not a virtue here &mdash; see Finding&nbsp;4</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The direction is consistent: flooring makes the toxicant look
+  <em>more</em> potent than it is, because the curve is forced to turn upward at
+  the bottom and the whole fit shifts to accommodate it. And the penalty grows the
+  further the true curve descends below zero &mdash; method B1 moves from
+  &minus;2.5% to &minus;5.5% to &minus;6.3% as the true decline deepens, while
+  methods A and C stay flat.</p>
+</section>
+
+<section>
+  <div class="rule"></div>
+  <div class="eyebrow">Finding 2</div>
+  <h2>A more precise experiment does not make the bias go away</h2>
+  <p>This is the result that settles the question. The simulation was run across
+  four levels of measurement noise, holding everything else fixed. Reading left to
+  right, the experiment gets more precise &mdash; the control variability falls from
+  9.6% to 1.9%.</p>
+
+  <p>If the disagreement between methods were just estimation error, every method
+  would converge on the truth as precision improves. That is exactly what methods
+  A, C and D do. The flooring methods do not: they level off at a fixed, non-zero
+  distance from the true value.</p>
+
+  <figure class="bleed">
+    <div class="figframe">
+      <svg viewBox="0 0 720 300" role="img"
+           aria-label="ErC50 bias against measurement precision. Methods A, C and D converge to zero bias; methods B1, B2 and B3 level off between minus 8 and minus 11 per cent.">
+        <!-- ===== left panel: methods that stay sound ===== -->
+        <text x="62" y="18" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11"
+              font-weight="600" letter-spacing="1.4" fill="var(--muted)">MEASUREMENT INTACT</text>
+        <!-- gridlines -->
+        <line x1="62" y1="130.0" x2="335" y2="130.0" stroke="var(--grid)" stroke-width="1"/>
+        <line x1="62" y1="201.4" x2="335" y2="201.4" stroke="var(--grid)" stroke-width="1"/>
+        <!-- zero reference: the truth -->
+        <line x1="62" y1="58.6" x2="335" y2="58.6" stroke="var(--ink)" stroke-width="1.25" opacity=".55"/>
+        <text x="66" y="53" font-family="ui-sans-serif,system-ui,sans-serif" font-size="10"
+              fill="var(--ink-2)">no bias</text>
+        <!-- y labels -->
+        <text x="56" y="62" text-anchor="end" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="var(--muted)">0%</text>
+        <text x="56" y="133.5" text-anchor="end" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="var(--muted)">−5%</text>
+        <text x="56" y="205" text-anchor="end" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="var(--muted)">−10%</text>
+        <!-- series -->
+        <polyline fill="none" stroke="var(--s-a)" stroke-width="2" stroke-linejoin="round"
+                  points="70,62.6 155,69.7 240,66.5 325,63.7"/>
+        <polyline fill="none" stroke="var(--s-c)" stroke-width="2" stroke-linejoin="round"
+                  points="70,67.0 155,78.0 240,77.1 325,72.2"/>
+        <polyline fill="none" stroke="var(--s-d)" stroke-width="2" stroke-linejoin="round"
+                  points="70,87.1 155,87.0 240,77.3 325,72.1"/>
+        <g stroke="var(--card)" stroke-width="2">
+          <circle cx="70" cy="62.6" r="4" fill="var(--s-a)"/><circle cx="155" cy="69.7" r="4" fill="var(--s-a)"/>
+          <circle cx="240" cy="66.5" r="4" fill="var(--s-a)"/><circle cx="325" cy="63.7" r="4" fill="var(--s-a)"/>
+          <circle cx="70" cy="67.0" r="4" fill="var(--s-c)"/><circle cx="155" cy="78.0" r="4" fill="var(--s-c)"/>
+          <circle cx="240" cy="77.1" r="4" fill="var(--s-c)"/><circle cx="325" cy="72.2" r="4" fill="var(--s-c)"/>
+          <circle cx="70" cy="87.1" r="4" fill="var(--s-d)"/><circle cx="155" cy="87.0" r="4" fill="var(--s-d)"/>
+          <circle cx="240" cy="77.3" r="4" fill="var(--s-d)"/><circle cx="325" cy="72.1" r="4" fill="var(--s-d)"/>
+        </g>
+        <!-- hit targets -->
+        <g fill="transparent">
+          <circle cx="70" cy="62.6" r="11"><title>A · CV 9.6% · −0.3%</title></circle>
+          <circle cx="155" cy="69.7" r="11"><title>A · CV 6.7% · −0.8%</title></circle>
+          <circle cx="240" cy="66.5" r="11"><title>A · CV 2.8% · −0.6%</title></circle>
+          <circle cx="325" cy="63.7" r="11"><title>A · CV 1.9% · −0.4%</title></circle>
+          <circle cx="70" cy="67.0" r="11"><title>C · CV 9.6% · −0.6%</title></circle>
+          <circle cx="155" cy="78.0" r="11"><title>C · CV 6.7% · −1.4%</title></circle>
+          <circle cx="240" cy="77.1" r="11"><title>C · CV 2.8% · −1.3%</title></circle>
+          <circle cx="325" cy="72.2" r="11"><title>C · CV 1.9% · −1.0%</title></circle>
+          <circle cx="70" cy="87.1" r="11"><title>D · CV 9.6% · −2.0%</title></circle>
+          <circle cx="155" cy="87.0" r="11"><title>D · CV 6.7% · −2.0%</title></circle>
+          <circle cx="240" cy="77.3" r="11"><title>D · CV 2.8% · −1.3%</title></circle>
+          <circle cx="325" cy="72.1" r="11"><title>D · CV 1.9% · −0.9%</title></circle>
+        </g>
+        <text x="335" y="106" text-anchor="end" font-family="ui-sans-serif,system-ui,sans-serif"
+              font-size="10.5" fill="var(--ink-2)">all three converge on the truth</text>
+
+        <!-- ===== right panel: the conventions ===== -->
+        <text x="425" y="18" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11"
+              font-weight="600" letter-spacing="1.4" fill="var(--muted)">ZERO BOUNDARY IMPOSED</text>
+        <line x1="425" y1="130.0" x2="698" y2="130.0" stroke="var(--grid)" stroke-width="1"/>
+        <line x1="425" y1="201.4" x2="698" y2="201.4" stroke="var(--grid)" stroke-width="1"/>
+        <line x1="425" y1="58.6" x2="698" y2="58.6" stroke="var(--ink)" stroke-width="1.25" opacity=".55"/>
+        <text x="429" y="53" font-family="ui-sans-serif,system-ui,sans-serif" font-size="10"
+              fill="var(--ink-2)">no bias</text>
+        <polyline fill="none" stroke="var(--s-b1)" stroke-width="2" stroke-dasharray="7 4" stroke-linejoin="round"
+                  points="433,137.4 518,158.2 603,174.6 688,175.4"/>
+        <polyline fill="none" stroke="var(--s-b3)" stroke-width="2" stroke-dasharray="7 4" stroke-linejoin="round"
+                  points="433,164.9 518,184.0 603,201.6 688,204.1"/>
+        <polyline fill="none" stroke="var(--s-b2)" stroke-width="2" stroke-dasharray="7 4" stroke-linejoin="round"
+                  points="433,201.8 518,210.1 603,218.9 688,220.4"/>
+        <g stroke="var(--card)" stroke-width="2">
+          <circle cx="433" cy="137.4" r="4" fill="var(--s-b1)"/><circle cx="518" cy="158.2" r="4" fill="var(--s-b1)"/>
+          <circle cx="603" cy="174.6" r="4" fill="var(--s-b1)"/><circle cx="688" cy="175.4" r="4" fill="var(--s-b1)"/>
+          <circle cx="433" cy="164.9" r="4" fill="var(--s-b3)"/><circle cx="518" cy="184.0" r="4" fill="var(--s-b3)"/>
+          <circle cx="603" cy="201.6" r="4" fill="var(--s-b3)"/><circle cx="688" cy="204.1" r="4" fill="var(--s-b3)"/>
+          <circle cx="433" cy="201.8" r="4" fill="var(--s-b2)"/><circle cx="518" cy="210.1" r="4" fill="var(--s-b2)"/>
+          <circle cx="603" cy="218.9" r="4" fill="var(--s-b2)"/><circle cx="688" cy="220.4" r="4" fill="var(--s-b2)"/>
+        </g>
+        <g fill="transparent">
+          <circle cx="433" cy="137.4" r="11"><title>B1 · CV 9.6% · −5.5%</title></circle>
+          <circle cx="518" cy="158.2" r="11"><title>B1 · CV 6.7% · −7.0%</title></circle>
+          <circle cx="603" cy="174.6" r="11"><title>B1 · CV 2.8% · −8.1%</title></circle>
+          <circle cx="688" cy="175.4" r="11"><title>B1 · CV 1.9% · −8.2%</title></circle>
+          <circle cx="433" cy="164.9" r="11"><title>B3 · CV 9.6% · −7.4%</title></circle>
+          <circle cx="518" cy="184.0" r="11"><title>B3 · CV 6.7% · −8.8%</title></circle>
+          <circle cx="603" cy="201.6" r="11"><title>B3 · CV 2.8% · −10.0%</title></circle>
+          <circle cx="688" cy="204.1" r="11"><title>B3 · CV 1.9% · −10.2%</title></circle>
+          <circle cx="433" cy="201.8" r="11"><title>B2 · CV 9.6% · −10.0%</title></circle>
+          <circle cx="518" cy="210.1" r="11"><title>B2 · CV 6.7% · −10.6%</title></circle>
+          <circle cx="603" cy="218.9" r="11"><title>B2 · CV 2.8% · −11.2%</title></circle>
+          <circle cx="688" cy="220.4" r="11"><title>B2 · CV 1.9% · −11.3%</title></circle>
+        </g>
+        <text x="694" y="172" font-family="ui-monospace,Menlo,monospace" font-size="10.5" fill="var(--s-b1)">B1</text>
+        <text x="694" y="201" font-family="ui-monospace,Menlo,monospace" font-size="10.5" fill="var(--s-b3)">B3</text>
+        <text x="694" y="217" font-family="ui-monospace,Menlo,monospace" font-size="10.5" fill="var(--s-b2)">B2</text>
+
+        <!-- shared x axis -->
+        <line x1="62" y1="248" x2="698" y2="248" stroke="var(--rule)" stroke-width="1"/>
+        <g font-family="ui-monospace,Menlo,monospace" font-size="10" fill="var(--muted)" text-anchor="middle">
+          <text x="70" y="264">9.6%</text><text x="155" y="264">6.7%</text>
+          <text x="240" y="264">2.8%</text><text x="325" y="264">1.9%</text>
+          <text x="433" y="264">9.6%</text><text x="518" y="264">6.7%</text>
+          <text x="603" y="264">2.8%</text><text x="688" y="264">1.9%</text>
+        </g>
+        <text x="380" y="288" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif"
+              font-size="11" fill="var(--ink-2)">control variability &mdash; the experiment gets more precise to the right &rarr;</text>
+      </svg>
+      <div class="legend" style="margin-top:14px">
+        <span style="color:var(--s-a)"><i style="background:currentColor"></i><b class="mono">A</b>&nbsp;as measured</span>
+        <span style="color:var(--s-c)"><i style="background:currentColor"></i><b class="mono">C</b>&nbsp;censored</span>
+        <span style="color:var(--s-d)"><i style="background:currentColor"></i><b class="mono">D</b>&nbsp;truncated</span>
+        <span style="color:var(--s-b1)"><i class="dash"></i><b class="mono">B1</b>&nbsp;floored</span>
+        <span style="color:var(--s-b3)"><i class="dash"></i><b class="mono">B3</b>&nbsp;floored + pinned</span>
+        <span style="color:var(--s-b2)"><i class="dash"></i><b class="mono">B2</b>&nbsp;pinned</span>
+      </div>
+    </div>
+    <figcaption><b>Error in the reported ErC50, against measurement precision.</b>
+    Each point is 240 simulated datasets. A quantity that does not vanish as the
+    noise vanishes is not estimation error &mdash; it is the method being wrong.
+    Solid lines keep the measurement; dashed lines impose the zero boundary.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="rule"></div>
+  <div class="eyebrow">Finding 3</div>
+  <h2>The confidence intervals collapse onto the wrong answer</h2>
+  <p>Bias alone understates the problem. A 95% credible interval is supposed to
+  contain the true value 95% of the time. As the experiment gets more precise, the
+  interval gets narrower &mdash; but under flooring its <em>centre</em> stays
+  displaced. The interval shrinks around a wrong number.</p>
+
+  <p>At the highest precision tested, methods B1 and B3 contained the true ErC50
+  in <strong>0 of 240</strong> simulated datasets. Not a low rate. Zero.</p>
+
+  <figure class="bleed">
+    <div class="figframe">
+      <svg viewBox="0 0 720 300" role="img"
+           aria-label="Interval coverage against measurement precision. Methods A, C and D stay between 0.78 and 0.94; methods B1 and B3 fall to zero while B2 rises to 1.0.">
+        <text x="62" y="18" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11"
+              font-weight="600" letter-spacing="1.4" fill="var(--muted)">MEASUREMENT INTACT</text>
+        <g stroke="var(--grid)" stroke-width="1">
+          <line x1="62" y1="80" x2="335" y2="80"/><line x1="62" y1="130" x2="335" y2="130"/>
+          <line x1="62" y1="180" x2="335" y2="180"/><line x1="62" y1="230" x2="335" y2="230"/>
+          <line x1="425" y1="80" x2="698" y2="80"/><line x1="425" y1="130" x2="698" y2="130"/>
+          <line x1="425" y1="180" x2="698" y2="180"/><line x1="425" y1="230" x2="698" y2="230"/>
+        </g>
+        <!-- nominal 95% -->
+        <line x1="62" y1="40" x2="335" y2="40" stroke="var(--ink)" stroke-width="1.25" opacity=".55" stroke-dasharray="2 3"/>
+        <line x1="425" y1="40" x2="698" y2="40" stroke="var(--ink)" stroke-width="1.25" opacity=".55" stroke-dasharray="2 3"/>
+        <text x="66" y="35" font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" fill="var(--ink-2)">nominal 95%</text>
+        <text x="429" y="35" font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" fill="var(--ink-2)">nominal 95%</text>
+        <g font-family="ui-monospace,Menlo,monospace" font-size="10" fill="var(--muted)" text-anchor="end">
+          <text x="56" y="83">0.75</text><text x="56" y="133">0.50</text>
+          <text x="56" y="183">0.25</text><text x="56" y="233">0</text>
+        </g>
+        <polyline fill="none" stroke="var(--s-a)" stroke-width="2" stroke-linejoin="round"
+                  points="70,42.4 155,45.0 240,53.4 325,55.8"/>
+        <polyline fill="none" stroke="var(--s-c)" stroke-width="2" stroke-linejoin="round"
+                  points="70,63.4 155,65.0 240,72.4 325,75.0"/>
+        <polyline fill="none" stroke="var(--s-d)" stroke-width="2" stroke-linejoin="round"
+                  points="70,61.6 155,65.0 240,70.8 325,70.0"/>
+        <g stroke="var(--card)" stroke-width="2">
+          <circle cx="70" cy="42.4" r="4" fill="var(--s-a)"/><circle cx="155" cy="45.0" r="4" fill="var(--s-a)"/>
+          <circle cx="240" cy="53.4" r="4" fill="var(--s-a)"/><circle cx="325" cy="55.8" r="4" fill="var(--s-a)"/>
+          <circle cx="70" cy="63.4" r="4" fill="var(--s-c)"/><circle cx="155" cy="65.0" r="4" fill="var(--s-c)"/>
+          <circle cx="240" cy="72.4" r="4" fill="var(--s-c)"/><circle cx="325" cy="75.0" r="4" fill="var(--s-c)"/>
+          <circle cx="70" cy="61.6" r="4" fill="var(--s-d)"/><circle cx="155" cy="65.0" r="4" fill="var(--s-d)"/>
+          <circle cx="240" cy="70.8" r="4" fill="var(--s-d)"/><circle cx="325" cy="70.0" r="4" fill="var(--s-d)"/>
+        </g>
+        <g fill="transparent">
+          <circle cx="70" cy="42.4" r="11"><title>A · CV 9.6% · 0.938</title></circle>
+          <circle cx="155" cy="45.0" r="11"><title>A · CV 6.7% · 0.925</title></circle>
+          <circle cx="240" cy="53.4" r="11"><title>A · CV 2.8% · 0.883</title></circle>
+          <circle cx="325" cy="55.8" r="11"><title>A · CV 1.9% · 0.871</title></circle>
+          <circle cx="70" cy="63.4" r="11"><title>C · CV 9.6% · 0.833</title></circle>
+          <circle cx="155" cy="65.0" r="11"><title>C · CV 6.7% · 0.825</title></circle>
+          <circle cx="240" cy="72.4" r="11"><title>C · CV 2.8% · 0.788</title></circle>
+          <circle cx="325" cy="75.0" r="11"><title>C · CV 1.9% · 0.775</title></circle>
+          <circle cx="70" cy="61.6" r="11"><title>D · CV 9.6% · 0.842</title></circle>
+          <circle cx="155" cy="65.0" r="11"><title>D · CV 6.7% · 0.825</title></circle>
+          <circle cx="240" cy="70.8" r="11"><title>D · CV 2.8% · 0.796</title></circle>
+          <circle cx="325" cy="70.0" r="11"><title>D · CV 1.9% · 0.800</title></circle>
+        </g>
+        <text x="335" y="105" text-anchor="end" font-family="ui-sans-serif,system-ui,sans-serif"
+              font-size="10.5" fill="var(--ink-2)">holds between 0.78 and 0.94</text>
+
+        <text x="425" y="18" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11"
+              font-weight="600" letter-spacing="1.4" fill="var(--muted)">ZERO BOUNDARY IMPOSED</text>
+        <polyline fill="none" stroke="var(--s-b1)" stroke-width="2" stroke-dasharray="7 4" stroke-linejoin="round"
+                  points="433,90.8 518,131.6 603,223.4 688,230"/>
+        <polyline fill="none" stroke="var(--s-b3)" stroke-width="2" stroke-dasharray="7 4" stroke-linejoin="round"
+                  points="433,111.6 518,163.4 603,229.2 688,230"/>
+        <polyline fill="none" stroke="var(--s-b2)" stroke-width="2" stroke-dasharray="7 4" stroke-linejoin="round"
+                  points="433,36.6 518,31.6 603,30 688,30"/>
+        <g stroke="var(--card)" stroke-width="2">
+          <circle cx="433" cy="90.8" r="4" fill="var(--s-b1)"/><circle cx="518" cy="131.6" r="4" fill="var(--s-b1)"/>
+          <circle cx="603" cy="223.4" r="4" fill="var(--s-b1)"/><circle cx="688" cy="230" r="4" fill="var(--s-b1)"/>
+          <circle cx="433" cy="111.6" r="4" fill="var(--s-b3)"/><circle cx="518" cy="163.4" r="4" fill="var(--s-b3)"/>
+          <circle cx="603" cy="229.2" r="4" fill="var(--s-b3)"/><circle cx="688" cy="230" r="4" fill="var(--s-b3)"/>
+          <circle cx="433" cy="36.6" r="4" fill="var(--s-b2)"/><circle cx="518" cy="31.6" r="4" fill="var(--s-b2)"/>
+          <circle cx="603" cy="30" r="4" fill="var(--s-b2)"/><circle cx="688" cy="30" r="4" fill="var(--s-b2)"/>
+        </g>
+        <g fill="transparent">
+          <circle cx="433" cy="90.8" r="11"><title>B1 · CV 9.6% · 0.696</title></circle>
+          <circle cx="518" cy="131.6" r="11"><title>B1 · CV 6.7% · 0.492</title></circle>
+          <circle cx="603" cy="223.4" r="11"><title>B1 · CV 2.8% · 0.033</title></circle>
+          <circle cx="688" cy="230" r="11"><title>B1 · CV 1.9% · 0.000 — 0 of 240</title></circle>
+          <circle cx="433" cy="111.6" r="11"><title>B3 · CV 9.6% · 0.592</title></circle>
+          <circle cx="518" cy="163.4" r="11"><title>B3 · CV 6.7% · 0.333</title></circle>
+          <circle cx="603" cy="229.2" r="11"><title>B3 · CV 2.8% · 0.004</title></circle>
+          <circle cx="688" cy="230" r="11"><title>B3 · CV 1.9% · 0.000 — 0 of 240</title></circle>
+          <circle cx="433" cy="36.6" r="11"><title>B2 · CV 9.6% · 0.967</title></circle>
+          <circle cx="518" cy="31.6" r="11"><title>B2 · CV 6.7% · 0.992</title></circle>
+          <circle cx="603" cy="30" r="11"><title>B2 · CV 2.8% · 1.000</title></circle>
+          <circle cx="688" cy="30" r="11"><title>B2 · CV 1.9% · 1.000</title></circle>
+        </g>
+        <text x="694" y="26" font-family="ui-monospace,Menlo,monospace" font-size="10.5" fill="var(--s-b2)">B2 &rarr; 1.00</text>
+        <text x="694" y="219" text-anchor="end" font-family="ui-sans-serif,system-ui,sans-serif"
+              font-size="10.5" fill="var(--ink-2)">B1 and B3 &rarr; 0 of 240</text>
+
+        <line x1="62" y1="248" x2="698" y2="248" stroke="var(--rule)" stroke-width="1"/>
+        <g font-family="ui-monospace,Menlo,monospace" font-size="10" fill="var(--muted)" text-anchor="middle">
+          <text x="70" y="264">9.6%</text><text x="155" y="264">6.7%</text>
+          <text x="240" y="264">2.8%</text><text x="325" y="264">1.9%</text>
+          <text x="433" y="264">9.6%</text><text x="518" y="264">6.7%</text>
+          <text x="603" y="264">2.8%</text><text x="688" y="264">1.9%</text>
+        </g>
+        <text x="380" y="288" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif"
+              font-size="11" fill="var(--ink-2)">control variability &mdash; the experiment gets more precise to the right &rarr;</text>
+      </svg>
+      <div class="legend" style="margin-top:14px">
+        <span style="color:var(--s-a)"><i style="background:currentColor"></i><b class="mono">A</b>&nbsp;as measured</span>
+        <span style="color:var(--s-c)"><i style="background:currentColor"></i><b class="mono">C</b>&nbsp;censored</span>
+        <span style="color:var(--s-d)"><i style="background:currentColor"></i><b class="mono">D</b>&nbsp;truncated</span>
+        <span style="color:var(--s-b1)"><i class="dash"></i><b class="mono">B1</b>&nbsp;floored</span>
+        <span style="color:var(--s-b3)"><i class="dash"></i><b class="mono">B3</b>&nbsp;floored + pinned</span>
+        <span style="color:var(--s-b2)"><i class="dash"></i><b class="mono">B2</b>&nbsp;pinned</span>
+      </div>
+    </div>
+    <figcaption><b>Proportion of 95% intervals that contained the true ErC50.</b>
+    The practical consequence: a laboratory that improves its technique, replicates
+    harder and reduces its variability will produce a floored analysis that is
+    <b>more confident and no less wrong</b>.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="rule"></div>
+  <div class="eyebrow">Finding 4</div>
+  <h2>The other failure looks like success</h2>
+  <p>Method B2 &mdash; pinning the curve's plateau to zero while leaving the data
+  alone &mdash; reaches 100% coverage. Every single interval contained the truth.
+  That is not a good result. Its intervals are simply so wide that they contain
+  almost anything, while its point estimate sits 11% low.</p>
+
+  <div class="callout warn">
+    <p><b>If coverage had been reported without a measure of interval width, the two
+    worst methods would have scored as the two best.</b> B2 would have looked
+    perfectly calibrated at 1.00, and B1 and B3 would have looked merely
+    imprecise rather than confidently wrong. Both readings are the opposite of
+    the truth.</p>
+  </div>
+
+  <p>On the real datasets B2's intervals are 2.9 and 116 times wider than the
+  intact analysis, and it was unusable for at least one endpoint on all four
+  datasets &mdash; its interval either ran to the edge of the tested concentration
+  range or spanned the entire design.</p>
+</section>
+
+<section>
+  <div class="rule"></div>
+  <div class="eyebrow">The real data</div>
+  <h2>What this costs on an actual test</h2>
+  <p>The simulation says which method is right. The four real datasets say how
+  much it matters in practice. On the two datasets where B2 produced a usable
+  ErC50 at all, it returned <strong>74% and 43%</strong> of the value the intact
+  analysis gave. The convention roughly halves the reported ErC50 on real data.</p>
+
+  <p>The clearest single illustration comes from a <em>Rhodomonas salina</em> test
+  where the population fell below the counting limit at the highest doses. The
+  lower plateau of the curve is the parameter most directly affected, and how you
+  declare those observations decides what you get:</p>
+
+  <div class="tscroll">
+  <table>
+    <thead>
+      <tr><th>How the below-limit values were declared</th>
+          <th class="num">Plateau estimate</th><th class="num">Interval width</th>
+          <th>What it means</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Substituted at the detection limit</td>
+          <td class="num">&minus;1.99</td><td class="num">0.06</td>
+          <td>Confidently precise &mdash; and asserting a value nobody measured</td></tr>
+      <tr><td>Censored: "at or below the limit"</td>
+          <td class="num">&minus;5.64</td><td class="num">8.49</td>
+          <td>Honest: the data contain almost nothing about this parameter</td></tr>
+      <tr><td>Interval-censored between extinction and the limit</td>
+          <td class="num">&minus;2.45</td><td class="num">0.59</td>
+          <td>Usable again, but resting on the assumed extinction floor</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Read the middle row carefully. Once the false assertion is withdrawn, the
+  interval widens 160-fold and runs down to a rate at which the population would
+  fall by a factor of e<sup>33</sup> over the test. That is the prior talking, not
+  the data. Nothing looks mechanically wrong &mdash; the chains mix, the convergence
+  diagnostic is 1.00 &mdash; which is precisely why substitution is dangerous.
+  It replaces an honest "we don't know" with a confident wrong number, and no
+  routine diagnostic flags it.</p>
+</section>
+
+<section>
+  <div class="rule"></div>
+  <div class="eyebrow">The boundary condition</div>
+  <h2>When none of this matters</h2>
+  <p>All of the above applies only where the test design actually reaches into
+  negative growth. Where the highest concentration stops at or before the point
+  the curve crosses zero &mdash; fewer than about 4% of observations negative
+  &mdash; the picture is completely different. There, the lower plateau is barely
+  identified by <em>any</em> method, all six carry a shared bias of the same sign
+  and similar size, and the flooring methods can even come out marginally ahead.</p>
+
+  <div class="callout">
+    <p>That is not evidence that flooring helps. It is the intact analysis
+    carrying a baseline error, from a plateau the design never measured, that
+    flooring happens to offset. Averaging the two situations together produces a
+    number that describes neither. <b>The single most useful diagnostic is the
+    fraction of your observations at or below zero growth</b> &mdash; if it is
+    negligible, the convention costs you nothing; if it is 15% or more, it costs
+    you the numbers above.</p>
+  </div>
+</section>
+
+<section>
+  <div class="rule"></div>
+  <div class="eyebrow">Recommendation</div>
+  <h2>What to do instead</h2>
+  <ul>
+    <li><b>Analyse the growth rates as measured</b> and let the model estimate the
+    lower plateau. Nothing in a Gaussian concentration&ndash;response fit requires
+    the response to be positive.</li>
+    <li><b>If the negative values were never recorded</b> &mdash; a common situation
+    with historical or third-party data &mdash; declare them as censored at zero.
+    This recovers essentially all of what flooring loses, and it is available when
+    re-analysing the raw values is not.</li>
+    <li><b>Do not convert to percent inhibition before fitting.</b> That step caps
+    the response at 100%, which is what pushes analysts toward a bounded model in
+    the first place. The problem enters in data preparation, not in the model.</li>
+    <li><b>Report the fraction of observations at or below zero growth</b>
+    alongside the endpoint, so a reader can tell whether the question even arises
+    for your dataset.</li>
+    <li><b>Never report interval coverage without interval width.</b> Finding 4 is
+    the reason.</li>
+  </ul>
+  <p>Methods A and C are close enough to be treated as equivalent on the evidence
+  here. The claim this study supports is not that one of them wins &mdash; it is
+  that <strong>B1, B2 and B3 lose</strong>.</p>
+</section>
+
+<section>
+  <div class="rule"></div>
+  <div class="eyebrow">Honesty</div>
+  <h2>What this study cannot claim</h2>
+  <ul>
+    <li><b>Neither recommended method reaches nominal coverage on ErC50.</b>
+    Method A holds 0.87&ndash;0.94 and method C 0.78&ndash;0.83 against a nominal
+    0.95. They are far better than the alternatives but they are not perfectly
+    calibrated, and that should be stated rather than glossed.</li>
+    <li><b>The NSEC endpoint was withdrawn.</b> It was going to be a third reported
+    endpoint, but it is defined against the spread of the control response, so the
+    true no-effect concentration is its limiting value rather than its expectation.
+    At realistic noise its coverage against the true value falls to zero for
+    <em>every</em> method including the intact one. Only method-to-method
+    contrasts are meaningful for it.</li>
+    <li><b>The original hypothesis was untestable.</b> The study set out to show
+    that the damage scales with a quantity derived from the control growth rate.
+    On the scale the endpoints are actually reported on, that quantity cannot
+    affect them &mdash; the model is exactly invariant to it, verified numerically.
+    The concentration axis simply does not involve it. The relevant axes turned out
+    to be how far the design reaches past zero, and how precise the measurement
+    is.</li>
+    <li><b>Four real datasets are close to powerless.</b> They are consistent with
+    the simulation, but they cannot order themselves by the predicted quantity, and
+    no single one of them is decisive. The simulation carries the argument.</li>
+    <li><b>The plateau parameter is prior-sensitive even in the recommended
+    methods.</b> Widening its prior sixteenfold moves it by a factor of nearly five.
+    It moves the reported ErC50 by at most 4.8%, against a 33% gap to the pinned
+    method &mdash; so the conclusions hold &mdash; but the plateau itself should not be
+    read as an estimate when the data do not reach it.</li>
+  </ul>
+</section>
+
+<section>
+  <div class="rule"></div>
+  <div class="eyebrow">Table view</div>
+  <h2>The numbers behind both figures</h2>
+  <div class="tscroll">
+  <table>
+    <thead>
+      <tr>
+        <th rowspan="2">Method</th>
+        <th class="num" colspan="4">ErC50 error</th>
+        <th class="num" colspan="4">Interval coverage</th>
+      </tr>
+      <tr>
+        <th class="num">CV 9.6%</th><th class="num">6.7%</th><th class="num">2.8%</th><th class="num">1.9%</th>
+        <th class="num">CV 9.6%</th><th class="num">6.7%</th><th class="num">2.8%</th><th class="num">1.9%</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="swatch" style="background:var(--s-a)"></span>A</td>
+        <td class="num">&minus;0.3%</td><td class="num">&minus;0.8%</td><td class="num">&minus;0.6%</td><td class="num">&minus;0.4%</td>
+        <td class="num">0.938</td><td class="num">0.925</td><td class="num">0.883</td><td class="num">0.871</td></tr>
+      <tr><td><span class="swatch" style="background:var(--s-c)"></span>C</td>
+        <td class="num">&minus;0.6%</td><td class="num">&minus;1.4%</td><td class="num">&minus;1.3%</td><td class="num">&minus;1.0%</td>
+        <td class="num">0.833</td><td class="num">0.825</td><td class="num">0.788</td><td class="num">0.775</td></tr>
+      <tr><td><span class="swatch" style="background:var(--s-d)"></span>D</td>
+        <td class="num">&minus;2.0%</td><td class="num">&minus;2.0%</td><td class="num">&minus;1.3%</td><td class="num">&minus;0.9%</td>
+        <td class="num">0.842</td><td class="num">0.825</td><td class="num">0.796</td><td class="num">0.800</td></tr>
+      <tr class="sep"><td><span class="swatch" style="background:var(--s-b1)"></span>B1</td>
+        <td class="num">&minus;5.5%</td><td class="num">&minus;7.0%</td><td class="num">&minus;8.1%</td><td class="num">&minus;8.2%</td>
+        <td class="num">0.696</td><td class="num">0.492</td><td class="num">0.033</td><td class="num">0.000</td></tr>
+      <tr><td><span class="swatch" style="background:var(--s-b3)"></span>B3</td>
+        <td class="num">&minus;7.4%</td><td class="num">&minus;8.8%</td><td class="num">&minus;10.0%</td><td class="num">&minus;10.2%</td>
+        <td class="num">0.592</td><td class="num">0.333</td><td class="num">0.004</td><td class="num">0.000</td></tr>
+      <tr><td><span class="swatch" style="background:var(--s-b2)"></span>B2</td>
+        <td class="num">&minus;10.0%</td><td class="num">&minus;10.6%</td><td class="num">&minus;11.2%</td><td class="num">&minus;11.3%</td>
+        <td class="num">0.967</td><td class="num">0.992</td><td class="num">1.000</td><td class="num">1.000</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="code">240 simulated datasets per cell. Fraction of observations below
+  zero growth held at 0.143&ndash;0.152 across all four precision levels, so only
+  the noise changes.</p>
+</section>
+
+<section>
+  <div class="rule"></div>
+  <div class="eyebrow">Provenance</div>
+  <h2>Where everything lives</h2>
+  <p>Every number on this page traces to a file in
+  <span class="code">/mnt/c/Rworking/negative-sgr</span>.</p>
+  <div class="files">
+  <dl>
+    <dt>analysis/phase5_metrics.csv</dt>
+    <dd>Bias, RMSE and coverage with Monte Carlo standard errors, for every
+    scenario, method and endpoint. The source for Findings 1&ndash;4.</dd>
+
+    <dt>analysis/phase5_r_axis.txt</dt>
+    <dd>The precision sweep as printed &mdash; both figures on this page.</dd>
+
+    <dt>analysis/phase5_report.log</dt>
+    <dd>Full report output, including the split by design regime and the
+    all-fits versus convergent-fits sensitivity check.</dd>
+
+    <dt>analysis/phase3_endpoints.csv &middot; phase3_parameters.csv</dt>
+    <dd>The four real datasets, all methods, endpoints and curve parameters.</dd>
+
+    <dt>analysis/phase4_prior_sweep.csv</dt>
+    <dd>The prior sensitivity check behind the last limitation.</dd>
+
+    <dt>analysis/phase5_metrics_cleanfits.csv</dt>
+    <dd>The same metrics restricted to fits with no sampler warnings. Kept as a
+    sensitivity analysis only &mdash; filtering on convergence would have
+    preferentially discarded the worst method's worst fits and flattered it.</dd>
+
+    <dt>../bayesnec/ignore/negative-sgr-study-plan.md</dt>
+    <dd>The full technical plan, revision 5, with the pre-registered predictions
+    and an "Observed result" section scoring each one. This page is the readable
+    version of its §Phase 4 and §Phase 5.</dd>
+
+    <dt>RESUME.md</dt>
+    <dd>Working handover: current state, open decisions and the traps that cost
+    this project time.</dd>
+  </dl>
+  </div>
+</section>
+
+<footer>
+  <p>Simulation: 12 scenarios &times; 240 iterations &times; 6 methods = 17,280 model
+  fits, 0 worker failures. Fitted with <span class="code">bayesnec</span> at a
+  pinned commit; <span class="code">nec4param</span>, Gaussian, identity link
+  throughout. Endpoints are absolute-scale ErCx &mdash; the decline from the control
+  plateau to zero growth &mdash; which is the OECD TG 201 definition and the reason
+  no normalisation is applied anywhere in the study.</p>
+</footer>
+
+</div>

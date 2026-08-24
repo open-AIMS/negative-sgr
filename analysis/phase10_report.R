@@ -356,7 +356,7 @@ wts_full$wi[is.na(wts_full$wi)] <- 0
 mw <- aggregate(wi ~ cell + arm + model, data = wts_full, FUN = mean)
 utils::write.csv(mw[order(mw$cell, mw$arm, -mw$wi), ],
                  file.path(OUT, "phase10_weights.csv"), row.names = FALSE)
-cat("\n=== mean stacking weight by arm (top 4 models) ===\n")
+cat("\n=== mean pseudo-BMA weight by arm (top 4 models) ===\n")
 for (cl in unique(mw$cell)) for (a in P10_ARMS) {
   z <- mw[mw$cell == cl & mw$arm == a, ]
   if (!nrow(z)) next

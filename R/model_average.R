@@ -275,7 +275,7 @@ p10_model_rhat <- function(fit) {
 #' Drop the models that did not converge, and re-stack over the rest
 #'
 #' The analyst's step, done the package's way: `rhat()` to find them,
-#' `amend(drop = )` to remove them and recompute the stacking weights over the
+#' `amend(drop = )` to remove them and recompute the model weights over the
 #' survivors. `amend()` reuses the existing fits and only refits models being
 #' ADDED, so a pure drop costs a re-weighting and not a re-sample.
 #'
@@ -313,7 +313,7 @@ p10_drop_nonconverged <- function(fit, cutoff = P10_RHAT_CUTOFF) {
        error = NA_character_)
 }
 
-#' Per-model stacking weights, and what the candidate set actually became
+#' Per-model weights, and what the candidate set actually became
 #'
 #' Recorded because an averaged estimate is uninterpretable without it: two arms
 #' can report the same ErC50 from entirely different mixtures, and an arm that

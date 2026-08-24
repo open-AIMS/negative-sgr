@@ -67,7 +67,7 @@ wanted <- if (nzchar(CELLS)) {
 } else if (PILOT) {
   ## Cell 12 alone. It is where the single-model failure is most extreme (B3 and
   ## E contained the true ErC50 in none of 500 datasets) AND where averaging has
-  ## its best chance, because at a 1.9% control CV the data resolve the stacking
+  ## its best chance, because at a 1.9% control CV the data resolve the model
   ## weights sharply. The hypothesis's best case is the right place to look first.
   12L
 } else {

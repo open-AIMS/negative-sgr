@@ -59,7 +59,7 @@ for (cl in names(lab)) {
     print(y[, c("arm", "bias_s", "bias_a", "bias_a_mcse", "cov_s", "cov_a",
                 "rmse_s", "rmse_a", "width_ratio")], row.names = FALSE)
   }
-  ## Mean stacking weight on the generating model, completed against the full
+  ## Mean pseudo-BMA weight on the generating model, completed against the full
   ## grid so that iterations where a model was dropped count as weight zero.
   wc <- w[w$stage == "converged" & w$cell == cl, ]
   g <- do.call(rbind, lapply(split(wc, ~ arm, drop = TRUE), function(d)

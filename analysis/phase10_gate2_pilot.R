@@ -228,7 +228,7 @@ cat("The plan budgeted 207 worker-minutes per iteration from the Phase 8 record.
 if (!is.null(wts)) {
   mw <- aggregate(wi ~ arm + model, data = wts, FUN = mean)
   mw <- mw[order(mw$arm, -mw$wi), ]
-  cat("\n-- mean stacking weight by arm (pilot, n =",
+  cat("\n-- mean pseudo-BMA weight by arm (pilot, n =",
       length(unique(wts$iteration)), "iterations) --\n")
   for (a in P10_ARMS) {
     z <- mw[mw$arm == a, ]

@@ -300,7 +300,7 @@ is no per-model init hook), so they take Stan's inits and are the arms that then
 lose models to the R-hat rule. Both costs land on the same two arms.
 
 **The R-hat rule.** Models with R-hat > 1.01 are dropped and the weights
-re-solved with `amend()`; stacking weights come from an optimisation over the
+re-solved with `amend()`; the weights are a function of the whole set, so the
 set and cannot be renormalised by hand. 12 of 32 arms lost at least one model.
 On `r_salina` C2 the dropped models had held **all** the weight, so the
 unfiltered average rested entirely on chains that had not mixed.
