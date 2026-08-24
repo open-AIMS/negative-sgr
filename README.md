@@ -41,21 +41,41 @@ convention. Data are generated from the same four-parameter threshold equation
 that is subsequently fitted, so that the only misspecification under study is the
 one each convention deliberately introduces.
 
-Eight approaches are compared, falling into three groups.
+Eight approaches are compared. They differ in how the zero boundary comes to be
+imposed — not at all, deliberately, or as a side effect of another choice — and
+that is the distinction the results turn on.
 
-| | data as measured | negatives floored at zero |
-|---|---|---|
-| lower asymptote free | **A** | **B1** |
-| lower asymptote fixed at zero | **B2** | **B3** |
+| | approach | negative values | lower asymptote | response distribution |
+|---|---|---|---|---|
+| **The measurement is retained** | **A** | used as measured | free | Gaussian |
+| | **C** | declared left-censored at zero | free | Gaussian |
+| | **D** | series truncated below the zero crossing | free | Gaussian |
+| **The boundary is imposed deliberately** | **B1** | replaced by zero | free | Gaussian |
+| | **B2** | used as measured | fixed at zero | Gaussian |
+| | **B3** | replaced by zero | fixed at zero | Gaussian |
+| **The boundary follows from the distribution** | **E** | replaced by zero, response scaled to a proportion | zero by construction | Beta |
+| | **F** | replaced by zero | zero by construction | Gamma |
 
-Three approaches retain the measurement: **A**, the intact analysis and the
-reference; **C**, which declares the negative values left-censored at zero, using
-the magnitude of neither; and **D**, which truncates the concentration series
-below the fitted zero crossing and discards the remainder. Three impose the
-boundary deliberately, by substituting data (**B1**), constraining the curve
-(**B2**), or both (**B3**). Two impose it implicitly through the choice of
-response distribution: **E** scales the floored response to a proportion and
-fits a Beta, and **F** fits a Gamma to the floored response unscaled.
+**A** is the reference: the analysis that does nothing to the negative values.
+**C** and **D** decline to use their magnitude — censoring records only that a
+value lies at or below zero, truncation discards the affected concentrations —
+so neither can place the lower asymptote, but neither asserts anything false
+about it either.
+
+The three **B** variants are the remaining cells of a two-by-two: floor the data
+or leave it, pin the asymptote or leave it free. Their contrasts are informative
+because flooring and pinning act on the residual scale in opposite directions.
+Flooring removes the most extreme low observations and so compresses it; pinning
+leaves them in place but puts them beyond the curve's reach and so inflates it.
+B3 combines both and its net effect is not predictable in advance, which is why
+the full set is run rather than the intact analysis against B3 alone.
+
+**E** and **F** differ from the rest in kind. Their flooring is not a decision
+about the negative values at all but a consequence of choosing a distribution
+with no support below zero — a choice usually made because the response
+resembles a proportion, or because the data have already been scaled. This is
+the most common treatment of these data in practice and the one whose
+consequences an analyst is least likely to have considered.
 
 The first six share a single prior, derived once from the intact response, so
 that a contrast between them isolates the likelihood rather than confounding it
@@ -93,14 +113,32 @@ eight carry a similar bias of the same sign. Only where the series runs past the
 crossing do the approaches separate, and only those scenarios support a
 comparison.
 
-**The conventions that impose the zero boundary bias the effect concentration
+**Every approach that imposes the zero boundary biases the effect concentration
 downward, making a substance appear more toxic than it is.** Averaged over the
-scenarios that reach past the crossing, the relative bias in ErC50 is
-approximately −5% for flooring the data alone, −6% for flooring with the
-asymptote pinned, −9% for pinning alone, and −9% for the Beta, against
-approximately +1% for the intact analysis and −0.3% for left-censoring. Interval
-coverage falls correspondingly, to 0.62 for the floored and pinned approach
-against a nominal 0.95.
+scenarios that reach past the crossing, at the realistic noise level:
+
+| approach | ErC50 relative bias | interval coverage | RMSE |
+|---|---|---|---|
+| A — measurement retained | +0.6% | 0.93 | 0.38 |
+| C — left-censored | −0.3% | 0.84 | 0.46 |
+| D — series truncated | −1.7% | 0.85 | 0.48 |
+| B1 — floored | −4.9% | 0.71 | 0.52 |
+| B3 — floored and pinned | −6.5% | 0.62 | 0.53 |
+| B2 — pinned | −9.5% | 0.97 | 0.63 |
+| E — floored, Beta | −8.7% | 0.64 | 0.59 |
+| F — floored, Gamma | −1.6% | 0.77 | 1.11 |
+
+Nominal coverage is 0.95. The third column is why it is reported: two rows are
+unreadable without it. **B2** reaches 0.97 not by being accurate but by being
+uncertain — its intervals are wide enough to contain almost anything, and its
+error is the second largest in the table. Coverage should never be quoted
+without a measure of spread beside it, or the two worst-performing approaches
+here would be scored as among the best.
+
+**F**'s −1.6% is an average over a quantity that changes sign across the depth
+of the asymptote, running from +14% to −13%; its error is three times the
+reference analysis's. An estimate that is 14% high in one scenario and 13% low
+in another averages to something respectable while being wrong in both.
 
 **The no-significant-effect concentration is affected more severely, and in the
 opposite direction**, being biased upward by tens of per cent — that is, toward
@@ -108,13 +146,13 @@ declaring a substance safer than it is, which for a protective metric is the mor
 serious failure.
 
 **The failures do not diminish as measurement improves; several worsen.** At the
-finest precision tested, three of the approaches contained the true ErC50 in none
-of 500 simulated datasets. A laboratory that improves its technique and reduces
+finest precision tested, **B1**, **B3** and **E** contained the true ErC50 in
+none of 500 simulated datasets. A laboratory that improves its technique and reduces
 its control variability will, if it floors its negative values, produce an
-analysis that is more confident and no less wrong. The two approaches whose
-distributional choice does the flooring produce the largest biases at high
-precision while also producing the cleanest sampler diagnostics, so the failure
-is silent.
+analysis that is more confident and no less wrong. **E** and **F**, whose distributional choice does the
+flooring, produce the largest ErC50 biases at high precision while also
+producing the cleanest sampler diagnostics — E returned not one divergent
+transition in 6,000 fits — so the failure is silent.
 
 **Fitting a candidate set rather than a single equation recovers much, but not
 all, of the loss.** Averaging over the candidate set reduces the ErC50 bias of the
